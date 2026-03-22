@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+AIC_ROOT=$(realpath "$(dirname "$0")")
+ARCH=$(uname -m)
+
+# Fix: Explicitly define the compiler
+CC=gcc
+
+# 1. Ask the compiler where its internal (resource) headers are
+TOOLCHAIN_INC=$($CC -print-file-name=include)
+
+# 2. Paths
+CRT1="$AIC_ROOT/build/objs/arch/$ARCH/crt1.o"
+LIBAIC="$AIC_ROOT/build/lib/libaic.a"
+INCLUDE="$AIC_ROOT/include"
+
+# 3. Compiler Flags
+# Added -I for the current directory so it finds hello.c relative to you
+CFLAGS="-nostdinc -isystem $INCLUDE -isystem $TOOLCHAIN_INC -fno-stack-protector -g"
+LDFLAGS="-nostdlib -static-pie"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: aic-cc <file.c> [flags]"
+    exit 1
+fi
+
+# 4. Execute the command
+# We use "$@" to pass any extra arguments (like -o my_app)
+$CC $CFLAGS "$@" $CRT1 $LIBAIC $LDFLAGS -o "${1%.*}"
+
+if [ $? -eq 0 ]; then
+    echo "[AIC-CC] Compiled ${1%.*} successfully."
+else
+    echo "[AIC-CC] Compilation failed."
+    exit 1
+fi
