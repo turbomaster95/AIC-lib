@@ -1,9 +1,12 @@
 #ifndef _UNISTD_H
 #define _UNISTD_H
 
-#include <stddef.h>
+extern char **environ;
 
-long fork(void);
+#include <stddef.h>
+#include <bits/types.h>
+
+pid_t fork(void);
 int execve(const char *filename, char *const argv[], char *const envp[]);
 char *getcwd(char *buf, size_t size);
 

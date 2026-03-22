@@ -1,12 +1,12 @@
 #include <internal/syscall.h>
 #include <unistd.h>
 
-long fork(void) {
-#if defined(__aarch64__)
-    // clone(flags, stack, parent_tid, child_tid, tls)
-    // 17 is SIGCHLD, which tells the kernel to notify the parent when child dies.
-    return __syscall5(SYS_fork, 17, 0, 0, 0, 0);
+pid_t fork(void) {
+#ifdef __aarch64__
+    // AArch64: clone(SIGCHLD, 0, 0, 0, 0)
+    return (pid_t)__syscall5(SYS_fork, 17, 0, 0, 0, 0);
 #else
-    return __syscall0(SYS_fork);
+    // x86_64: fork() has 0 arguments
+    return (pid_t)__syscall0(SYS_fork);
 #endif
 }
