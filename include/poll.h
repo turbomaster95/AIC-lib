@@ -2,6 +2,8 @@
 #define _POLL_H
 
 #include <bits/types.h>
+#include <signal.h>
+#include <time.h>
 
 /* Poll events */
 #define POLLIN      0x0001

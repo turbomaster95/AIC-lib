@@ -27,14 +27,6 @@ void *memmove(void *dest, const void *src, size_t n) {
     return dest;
 }
 
-void *memset(void *s, int c, size_t n) {
-    unsigned char *p = s;
-    while (n--) {
-        *p++ = (unsigned char)c;
-    }
-    return s;
-}
-
 void *memchr(const void *s, int c, size_t n) {
     const unsigned char *p = s;
     while (n--) {

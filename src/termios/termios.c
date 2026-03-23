@@ -28,7 +28,7 @@ int tcgetattr(int fd, struct termios *termios_p) {
         return -1;
     }
     
-    long ret = __syscall2(SYS_ioctl, (long)fd, TCGETS, (long)termios_p);
+    long ret = __syscall3(SYS_ioctl, (long)fd, TCGETS, (long)termios_p);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -61,7 +61,7 @@ int tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
             return -1;
     }
     
-    long ret = __syscall2(SYS_ioctl, (long)fd, request, (long)termios_p);
+    long ret = __syscall3(SYS_ioctl, (long)fd, request, (long)termios_p);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -72,7 +72,7 @@ int tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
 }
 
 int tcflush(int fd, int queue_selector) {
-    long ret = __syscall2(SYS_ioctl, (long)fd, TCFLSH, (long)queue_selector);
+    long ret = __syscall3(SYS_ioctl, (long)fd, TCFLSH, (long)queue_selector);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -83,7 +83,7 @@ int tcflush(int fd, int queue_selector) {
 }
 
 int tcflow(int fd, int action) {
-    long ret = __syscall2(SYS_ioctl, (long)fd, TCXONC, (long)action);
+    long ret = __syscall3(SYS_ioctl, (long)fd, TCXONC, (long)action);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -94,7 +94,7 @@ int tcflow(int fd, int action) {
 }
 
 int tcsendbreak(int fd, int duration) {
-    long ret = __syscall2(SYS_ioctl, (long)fd, TCSBRK, (long)0);
+    long ret = __syscall3(SYS_ioctl, (long)fd, TCSBRK, (long)0);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -105,7 +105,7 @@ int tcsendbreak(int fd, int duration) {
 }
 
 int tcdrain(int fd) {
-    long ret = __syscall2(SYS_ioctl, (long)fd, TCSBRK, (long)1);
+    long ret = __syscall3(SYS_ioctl, (long)fd, TCSBRK, (long)1);
     
     if (ret < 0) {
         errno = (int)(-ret);

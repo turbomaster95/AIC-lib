@@ -3,6 +3,7 @@
 
 #include <bits/types.h>
 #include <time.h>
+#include <signal.h>
 
 /* fd_set size */
 #define FD_SETSIZE 1024

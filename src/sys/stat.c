@@ -118,7 +118,7 @@ int mkdir(const char *pathname, int mode) {
     }
     
 #ifdef __aarch64__
-    long ret = __syscall3(SYS_mkdirat, (long)AT_FDCWD, (long)pathname, (long)mode);
+    long ret = __syscall3(SYS_mkdir, (long)AT_FDCWD, (long)pathname, (long)mode);
 #else
     long ret = __syscall2(SYS_mkdir, (long)pathname, (long)mode);
 #endif
@@ -158,7 +158,7 @@ int unlink(const char *pathname) {
     }
     
 #ifdef __aarch64__
-    long ret = __syscall3(SYS_unlinkat, (long)AT_FDCWD, (long)pathname, 0);
+    long ret = __syscall3(SYS_unlink, (long)AT_FDCWD, (long)pathname, 0);
 #else
     long ret = __syscall1(SYS_unlink, (long)pathname);
 #endif

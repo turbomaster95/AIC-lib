@@ -22,6 +22,7 @@ INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/arch/$(A
 CFLAGS      = $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC
 CFLAGS_DBG  = $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC
 ASFLAGS     = $(INCLUDES) -nostdlib -Wall
+TCCFLAGS    = -D"__syscall_gen=tcc_syscall_gen" -include include/tccf/tcc_fix.h $(INCLUDES) -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC
 
 # Output paths
 BUILD_DIR   = build
@@ -58,7 +59,7 @@ DEPS        = $(ALL_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
 
 # --- 5. Default Target ---
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TCC_BIN) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(TCC_BIN) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
 # --- 6. Directory Creation ---
@@ -119,10 +120,10 @@ $(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.s
 	@$(CC) $(ASFLAGS) -c $< -o $@
 
 # --- 10. Test Binary Rules ---
-build/tests/%.o: tests/%.c
+build/tests/%.o: tests/%.c $(TCC_BIN)
 	@mkdir -p $(dir $@)
 	@echo "[TEST-CC] $<"
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(TCC_BIN) $(TCCFLAGS) -c $< -o $@
 
 bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
 	@mkdir -p bin
@@ -193,7 +194,7 @@ package: all install-sysroot
 T ?= test_hello
 
 .PHONY: run
-run: all
+run: all $(TCC_BIN)
 	@echo "[AIC-TCC] Compiling tests/$(T).c..."
 	@mkdir -p bin build/tests
 	@LD_LIBRARY_PATH=$(TCC_DIR) $(TCC_BIN) -B$(TCC_DIR) \

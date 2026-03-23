@@ -93,37 +93,6 @@ char *strstr(const char *haystack, const char *needle) {
     return 0;
 }
 
-char *strtok(char *str, const char *delim) {
-    static char *saveptr;
-    return strtok_r(str, delim, &saveptr);
-}
-
-char *strtok_r(char *str, const char *delim, char **saveptr) {
-    char *token;
-    
-    if (str == NULL) {
-        str = *saveptr;
-    }
-    
-    /* Skip leading delimiters */
-    str += strspn(str, delim);
-    
-    if (*str == '\0') {
-        *saveptr = str;
-        return NULL;
-    }
-    
-    token = str;
-    str += strcspn(str, delim);
-    
-    if (*str) {
-        *str++ = '\0';
-    }
-    
-    *saveptr = str;
-    return token;
-}
-
 int strcasecmp(const char *s1, const char *s2) {
     unsigned char c1, c2;
     
