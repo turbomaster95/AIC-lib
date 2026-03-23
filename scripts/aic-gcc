@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# =============================================================================
+# AIC-GCC - AIC Standard Library Compiler Driver
+# =============================================================================
+# Drop-in replacement for gcc that compiles against AIC libc.
+# Automatically handles sysroot, startup files, and library linking.
+#
+# Usage: aic-gcc [gcc options] <source.c> -o <output>
+#
+# Environment Variables:
+#   AIC_BUILD_INFO   - Custom build info string (default: "Built: YYYY-MM-DD")
+#   AIC_CC           - Override the C compiler (default: gcc)
+#   AIC_NO_BUILDID   - Set to "1" to disable build info injection
+# =============================================================================
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARCH=$(uname -m)
+
+# Compiler selection
+CC="${AIC_CC:-gcc}"
+
+# Detect if we're running from within a sysroot or from the source tree
+if [[ "$SCRIPT_DIR" == */bin ]] && [ -f "$SCRIPT_DIR/aic-gcc" ]; then
+    PARENT_DIR="$(dirname "$SCRIPT_DIR")"
+    if [ -d "$PARENT_DIR/usr/lib" ] && [ -d "$PARENT_DIR/include" ]; then
+        SYSROOT="$PARENT_DIR"
+        AIC_ROOT=""
+    fi
+fi
+
+# If not in sysroot, find AIC_ROOT
+if [ -z "$SYSROOT" ]; then
+    AIC_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+    if [ -d "$AIC_ROOT/sysroot" ]; then
+        SYSROOT="$AIC_ROOT/sysroot"
+    elif [ -d "$AIC_ROOT/build/sysroot" ]; then
+        SYSROOT="$AIC_ROOT/build/sysroot"
+    fi
+fi
+
+# Detect build artifacts
+CRT1_DIR=""
+LIB_DIR=""
+INC_DIR=""
+
+if [ -n "$SYSROOT" ]; then
+    CRT1_DIR="$SYSROOT/usr/lib"
+    LIB_DIR="$SYSROOT/usr/lib"
+    INC_DIR="$SYSROOT/usr/include"
+elif [ -n "$AIC_ROOT" ]; then
+    CRT1_DIR="$AIC_ROOT/build/objs/arch/$ARCH"
+    LIB_DIR="$AIC_ROOT/build/lib"
+    INC_DIR="$AIC_ROOT/include"
+fi
+
+# Find crt1.o
+CRT1=""
+for dir in "$CRT1_DIR" "$AIC_ROOT/build/objs/arch/$ARCH" "$SYSROOT/lib"; do
+    if [ -f "$dir/crt1.o" ]; then
+        CRT1="$dir/crt1.o"
+        break
+    fi
+done
+
+if [ -z "$CRT1" ] || [ ! -f "$CRT1" ]; then
+    echo "aic-gcc: error: cannot find crt1.o" >&2
+    echo "Searched: $CRT1_DIR" >&2
+    echo "Run 'make' first." >&2
+    exit 1
+fi
+
+# Find library
+LIBAIC=""
+for dir in "$LIB_DIR" "$AIC_ROOT/build/lib" "$SYSROOT/lib"; do
+    if [ -f "$dir/libaic.a" ]; then
+        LIBAIC="$dir/libaic.a"
+        break
+    fi
+done
+
+if [ -z "$LIBAIC" ]; then
+    echo "aic-gcc: error: cannot find libaic.a" >&2
+    echo "Run 'make' first." >&2
+    exit 1
+fi
+
+# Build gcc command
+SYSROOT_ARGS=""
+if [ -n "$SYSROOT" ]; then
+    SYSROOT_ARGS="--sysroot=$SYSROOT"
+fi
+
+# Separate user args from output specification
+OUTPUT=""
+SOURCES=()
+USER_ARGS=()
+COMPILE_ONLY=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        -c)
+            COMPILE_ONLY=1
+            USER_ARGS+=("$1")
+            shift
+            ;;
+        -v|--version|-h|--help)
+            echo "AIC-GCC - AIC Standard Library Compiler Driver"
+            echo ""
+            echo "Usage: aic-gcc [gcc options] <source.c> -o <output>"
+            echo ""
+            echo "Environment Variables:"
+            echo "  AIC_BUILD_INFO   Custom build info string (default: 'Built: YYYY-MM-DD')"
+            echo "  AIC_CC           Override C compiler (default: gcc)"
+            echo "  AIC_NO_BUILDID   Set to '1' to disable build info injection"
+            echo ""
+            echo "Examples:"
+            echo "  aic-gcc hello.c -o hello"
+            echo "  AIC_BUILD_INFO='v1.0' aic-gcc hello.c -o hello"
+            echo "  AIC_NO_BUILDID=1 aic-gcc hello.c -o hello"
+            exit 0
+            ;;
+        *)
+            if [[ "$1" == *.c || "$1" == *.s || "$1" == *.S || "$1" == *.i ]]; then
+                SOURCES+=("$1")
+            else
+                USER_ARGS+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check for source files
+if [ ${#SOURCES[@]} -eq 0 ]; then
+    echo "aic-gcc: error: no input files" >&2
+    echo "Usage: aic-gcc [options] <source.c> [-o output]" >&2
+    exit 1
+fi
+
+# Set default output
+if [ -z "$OUTPUT" ]; then
+    if [ $COMPILE_ONLY -eq 1 ]; then
+        OUTPUT="${SOURCES[0]%.c}.o"
+    else
+        OUTPUT="a.out"
+    fi
+fi
+
+# =============================================================================
+# Build Info Injection (ELF Note Section)
+# =============================================================================
+# This adds a .note.AIC section to every executable with build timestamp.
+# Controlled via AIC_BUILD_INFO environment variable.
+# =============================================================================
+
+BUILD_INFO_OBJ=""
+
+if [ $COMPILE_ONLY -eq 0 ] && [ -z "$AIC_NO_BUILDID" ]; then
+    # Generate build info string
+    if [ -n "$AIC_BUILD_INFO" ]; then
+        BUILD_STR="$AIC_BUILD_INFO"
+    else
+        BUILD_STR="Built: $(date +%Y-%m-%d)"
+    fi
+    
+    # Create temporary assembly file with ELF note
+    BUILD_INFO_S=$(mktemp -t aic_build_XXXXXX.s)
+    BUILD_INFO_OBJ=$(mktemp -t aic_build_XXXXXX.o)
+    
+    # Calculate sizes
+    # Name is "AIC\0" = 4 bytes (already 4-byte aligned)
+    NAME_SZ=4
+    
+    # Description is the string + null terminator, padded to 4-byte multiple
+    DESC_RAW_LEN=$((${#BUILD_STR} + 1))
+    DESC_SZ=$(( ((DESC_RAW_LEN + 3) / 4) * 4 ))
+    
+    # Generate padding bytes
+    PAD_BYTES=$((DESC_SZ - DESC_RAW_LEN))
+    
+    cat > "$BUILD_INFO_S" << EOF
+.section .note.AIC, "a", @note
+.long ${NAME_SZ}
+.long ${DESC_SZ}
+.long 1
+.ascii "AIC\0"
+.ascii "${BUILD_STR}"
+.byte 0
+EOF
+    
+    # Add padding bytes if needed
+    for i in $(seq 1 $PAD_BYTES); do
+        echo ".byte 0" >> "$BUILD_INFO_S"
+    done
+    
+    # Assemble the note object
+    if ! $CC -c "$BUILD_INFO_S" -o "$BUILD_INFO_OBJ" 2>/dev/null; then
+        rm -f "$BUILD_INFO_S" "$BUILD_INFO_OBJ"
+        BUILD_INFO_OBJ=""
+    else
+        rm -f "$BUILD_INFO_S"
+    fi
+fi
+
+# Cleanup function for temp files
+cleanup() {
+    if [ -n "$BUILD_INFO_OBJ" ] && [ -f "$BUILD_INFO_OBJ" ]; then
+        rm -f "$BUILD_INFO_OBJ"
+    fi
+}
+trap cleanup EXIT
+
+# =============================================================================
+# Build the command
+# =============================================================================
+
+if [ $COMPILE_ONLY -eq 1 ]; then
+    # Compile only - no linking needed
+    exec $CC $SYSROOT_ARGS \
+        -nostdlib \
+        -ffreestanding \
+        -fno-stack-protector \
+        "${USER_ARGS[@]}" \
+        "${SOURCES[@]}" \
+        -o "$OUTPUT"
+else
+    # Full compile and link
+    CMD="$CC $SYSROOT_ARGS \
+        -nostdlib \
+        -ffreestanding \
+        -fno-stack-protector \
+        ${USER_ARGS[*]} \
+        ${SOURCES[*]} \
+        $CRT1"
+    
+    # Add build info object if generated
+    if [ -n "$BUILD_INFO_OBJ" ] && [ -f "$BUILD_INFO_OBJ" ]; then
+        CMD="$CMD $BUILD_INFO_OBJ"
+    fi
+    
+    CMD="$CMD $LIBAIC -o $OUTPUT"
+    
+    exec $CMD
+fi

@@ -1,14 +1,81 @@
 #ifndef AIC_BITS_SYSCALL_H
 #define AIC_BITS_SYSCALL_H
 
-#define __NR_read  63
-#define __NR_write 64
-#define __NR_brk   214
-#define __NR_exit  93
-#define __NR_clone   220 // Modern fork
-#define __NR_execve  221
-#define __NR_wait4   260 // To wait for the child process
-#define __NR_chdir 49
-#define __NR_getcwd 17
+/* AArch64 Linux syscall numbers (Android-compatible) */
+#define __NR_read              63
+#define __NR_write             64
+#define __NR_close             57
+#define __NR_lseek             62
+#define __NR_mmap             222
+#define __NR_munmap           215
+#define __NR_brk              214
+#define __NR_exit              93
+#define __NR_exit_group       231
+#define __NR_fork             220
+#define __NR_clone            220
+#define __NR_execve           221
+#define __NR_wait4            260
+#define __NR_wait             260
+#define __NR_openat            56
+#define __NR_open              56
+#define __NR_creat             56
+#define __NR_unlinkat          87
+#define __NR_unlink            87
+#define __NR_mkdirat           83
+#define __NR_mkdir             83
+#define __NR_chdir             49
+#define __NR_fchdir           272
+#define __NR_getcwd            17
+#define __NR_getpid            17
+#define __NR_getppid           18
+#define __NR_getuid           174
+#define __NR_geteuid          175
+#define __NR_getgid           176
+#define __NR_getegid          177
+#define __NR_setuid           105
+#define __NR_setgid           106
+#define __NR_setreuid         113
+#define __NR_setregid         114
+#define __NR_setpgid          154
+#define __NR_getpgid          155
+#define __NR_getpgrp          154
+#define __NR_setsid           157
+#define __NR_getsid           156
+#define __NR_kill             129
+#define __NR_ioctl             29
+#define __NR_fstat             80
+#define __NR_stat              79
+#define __NR_lstat             79
+#define __NR_newfstatat        79
+#define __NR_faccessat         48
+#define __NR_fchmodat          52
+#define __NR_fchmod            51
+#define __NR_fchownat          54
+#define __NR_fchown            93
+#define __NR_chown             92
+#define __NR_rmdir             84
+#define __NR_rt_sigaction      13
+#define __NR_rt_sigreturn     139
+#define __NR_gettimeofday     169
+#define __NR_settimeofday     170
+#define __NR_time             106
+#define __NR_pipe2             94
+#define __NR_pipe              94
+#define __NR_dup               23
+#define __NR_dup2              24
+#define __NR_dup3              24
+#define __NR_getdents64        61
+#define __NR_poll               7
+#define __NR_ppoll            271
+#define __NR_select            72
+#define __NR_pselect6          72
+#define __NR_uname            160
+#define __NR_clock_gettime    113
+#define __NR_clock_getres     114
+#define __NR_nanosleep        115
+#define __NR_fsync             82
+#define __NR_fdatasync         83
+#define __NR_sysconf           30
+#define __NR_faccessat2       439
 
 #endif

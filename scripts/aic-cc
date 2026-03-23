@@ -1,36 +1,167 @@
 #!/usr/bin/env bash
+# =============================================================================
+# AIC-CC - AIC Standard Library Compiler Wrapper
+# =============================================================================
+# Usage: aic-cc [options] <source.c> [-o output]
+#
+# This script wraps GCC/Clang to compile and link programs against the
+# AIC standard library instead of the system libc.
+# =============================================================================
 
-AIC_ROOT=$(realpath "$(dirname "$0")")
+set -e
+
+# Detect script directory and AIC root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AIC_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Auto-detect architecture
 ARCH=$(uname -m)
 
-# Fix: Explicitly define the compiler
-CC=gcc
+# Default compiler (can be overridden via AIC_CC env var)
+CC="${AIC_CC:-gcc}"
 
-# 1. Ask the compiler where its internal (resource) headers are
-TOOLCHAIN_INC=$($CC -print-file-name=include)
-
-# 2. Paths
+# Find AIC build artifacts
 CRT1="$AIC_ROOT/build/objs/arch/$ARCH/crt1.o"
-LIBAIC="$AIC_ROOT/build/lib/libaic.a"
-INCLUDE="$AIC_ROOT/include"
+LIBAIC_STATIC="$AIC_ROOT/build/lib/libaic.a"
+LIBAIC_SHARED="$AIC_ROOT/build/lib/libaic.so"
+SYSROOT="${AIC_ROOT}/sysroot"
 
-# 3. Compiler Flags
-# Added -I for the current directory so it finds hello.c relative to you
-CFLAGS="-nostdinc -isystem $INCLUDE -isystem $TOOLCHAIN_INC -fno-stack-protector -g"
+# Include paths
+AIC_INCLUDE="$AIC_ROOT/include"
+TOOLCHAIN_INC=$($CC -print-file-name=include 2>/dev/null || echo "")
+
+# Default flags
+CFLAGS="-nostdlib -ffreestanding -fno-stack-protector -fPIC"
 LDFLAGS="-nostdlib -static-pie"
+INCLUDES="-isystem $AIC_INCLUDE"
 
-if [ $# -eq 0 ]; then
-    echo "Usage: aic-cc <file.c> [flags]"
+if [ -n "$TOOLCHAIN_INC" ] && [ -d "$TOOLCHAIN_INC" ]; then
+    INCLUDES="$INCLUDES -isystem $TOOLCHAIN_INC"
+fi
+
+# Output file (default: a.out)
+OUTPUT=""
+SOURCES=()
+EXTRA_CFLAGS=()
+EXTRA_LDFLAGS=()
+LINK_MODE="static"
+COMPILE_ONLY=0
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        -c)
+            COMPILE_ONLY=1
+            shift
+            ;;
+        -shared|-dynamic)
+            LINK_MODE="shared"
+            LDFLAGS="${LDFLAGS/-static/}"
+            shift
+            ;;
+        -static)
+            LINK_MODE="static"
+            shift
+            ;;
+        -g|-O0|-O1|-O2|-O3|-Os|-Ofast)
+            EXTRA_CFLAGS+=("$1")
+            shift
+            ;;
+        -I*)
+            INCLUDES="$INCLUDES $1"
+            shift
+            ;;
+        -L*)
+            EXTRA_LDFLAGS+=("$1")
+            shift
+            ;;
+        -l*)
+            EXTRA_LDFLAGS+=("$1")
+            shift
+            ;;
+        -v|--version)
+            echo "aic-cc (AIC Standard Library) 1.0.0"
+            echo "Target: $ARCH-linux-gnu"
+            echo "AIC Root: $AIC_ROOT"
+            exit 0
+            ;;
+        -h|--help)
+            echo "Usage: aic-cc [options] <source.c> [-o output]"
+            echo ""
+            echo "Options:"
+            echo "  -o <file>      Output file name (default: a.out)"
+            echo "  -c             Compile only, do not link"
+            echo "  -static        Link statically (default)"
+            echo "  -shared        Link dynamically"
+            echo "  -g             Enable debug symbols"
+            echo "  -O[0-3|s|fast] Optimization level"
+            echo "  -I<dir>        Add include directory"
+            echo "  -L<dir>        Add library directory"
+            echo "  -l<lib>        Link library"
+            echo "  -v, --version  Show version information"
+            echo "  -h, --help     Show this help message"
+            echo ""
+            echo "Environment Variables:"
+            echo "  AIC_CC         Override the C compiler (default: gcc)"
+            exit 0
+            ;;
+        -*)
+            EXTRA_CFLAGS+=("$1")
+            shift
+            ;;
+        *)
+            SOURCES+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Check for source files
+if [ ${#SOURCES[@]} -eq 0 ]; then
+    echo "aic-cc: error: no input files"
+    echo "Usage: aic-cc [options] <source.c> [-o output]"
+    echo "Try 'aic-cc --help' for more information."
     exit 1
 fi
 
-# 4. Execute the command
-# We use "$@" to pass any extra arguments (like -o my_app)
-$CC $CFLAGS "$@" $CRT1 $LIBAIC $LDFLAGS -o "${1%.*}"
-
-if [ $? -eq 0 ]; then
-    echo "[AIC-CC] Compiled ${1%.*} successfully."
-else
-    echo "[AIC-CC] Compilation failed."
+# Check build artifacts exist
+if [ ! -f "$CRT1" ]; then
+    echo "aic-cc: error: startup file not found: $CRT1"
+    echo "Run 'make' in $AIC_ROOT first."
     exit 1
+fi
+
+if [ ! -f "$LIBAIC_STATIC" ]; then
+    echo "aic-cc: error: library not found: $LIBAIC_STATIC"
+    echo "Run 'make' in $AIC_ROOT first."
+    exit 1
+fi
+
+# Set default output
+if [ -z "$OUTPUT" ]; then
+    if [ $COMPILE_ONLY -eq 1 ]; then
+        # For compile-only, output is source.o
+        OUTPUT="${SOURCES[0]%.c}.o"
+    else
+        OUTPUT="a.out"
+    fi
+fi
+
+# Build command
+CMD="$CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS"
+
+if [ $COMPILE_ONLY -eq 1 ]; then
+    # Compile only
+    exec $CMD -c "${SOURCES[@]}" -o "$OUTPUT"
+else
+    # Compile and link
+    if [ "$LINK_MODE" = "static" ]; then
+        exec $CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS "${SOURCES[@]}" $CRT1 $LIBAIC_STATIC ${EXTRA_LDFLAGS[*]} $LDFLAGS -o "$OUTPUT"
+    else
+        exec $CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS "${SOURCES[@]}" $CRT1 -L"$AIC_ROOT/build/lib" -laic ${EXTRA_LDFLAGS[*]} $LDFLAGS -o "$OUTPUT"
+    fi
 fi
