@@ -11,6 +11,17 @@ CC      = gcc
 AR      = ar
 LD      = ld.lld
 OBJCOPY = objcopy
+IS_ANDROID = $(shell uname -o | grep -qi "android" && echo yes || echo no)
+
+# Define PIE flags only if needed
+ifeq ($(IS_ANDROID),yes)
+    PIE_LDFLAGS = -pie
+    # Note: For Android, we also usually need to specify the 
+    # page size for the ELF header if it's modern Android.
+    # PIE_LDFLAGS += -z max-page-size=4096
+else
+    PIE_LDFLAGS = 
+endif
 
 # --- 2. Path Definitions ---
 AIC_ROOT    = $(shell pwd)
@@ -19,9 +30,15 @@ SYSROOT     ?= $(AIC_ROOT)/sysroot
 INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/arch/$(ARCH)
 
 # Build flags
-CFLAGS      = $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC
-CFLAGS_DBG  = $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC
-ASFLAGS     = $(INCLUDES) -nostdlib -Wall
+ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
+    ARCFLAGS += -m32
+else
+    ARCFLAGS += -m64
+endif
+
+CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
+CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra
+ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
 TCCFLAGS    = -D"__syscall_gen=tcc_syscall_gen" -include include/tccf/tcc_fix.h $(INCLUDES) -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC
 
 # Output paths
@@ -36,14 +53,16 @@ LIB_SHARED  = $(LIB_DIR)/libaic.so
 LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
-# TCC Paths
+# --- 2a. TinyCC part ---
 TCC_DIR     = $(AIC_ROOT)/third_party/tinycc
 TCC_BIN     = $(TCC_DIR)/tcc
+TCC_CC   = gcc   # set it to $(AIC_ROOT)/scripts/aic-gcc after all the headers and things are done :)
+TCC_CONFFLAGS = --cc=$(TCC_CC) --prefix=$(AIC_ROOT)/build/tcc --cpu=$(ARCH) --extra-cflags="$(ARCFLAGS)" --extra-ldflags="$(ARCFLAGS)"
 
 # --- 3. Automatic Source Discovery ---
 SRCS        = $(shell find src -name "*.c" ! -path "*/arch/*/*")
-ARCH_SRCS   = $(shell find src/arch/$(ARCH) -name "*.c" 2>/dev/null)
-ARCH_ASMS   = $(shell find src/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
+ARCH_SRCS   = $(shell find -L src/arch/$(ARCH) -name "*.c" 2>/dev/null)
+ARCH_ASMS   = $(shell find -L src/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
 ALL_SRCS    = $(SRCS) $(ARCH_SRCS)
 STARTUP     = src/arch/$(ARCH)/crt1.s
 TEST_SRCS   = $(wildcard tests/*.c)
@@ -59,7 +78,7 @@ DEPS        = $(ALL_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
 
 # --- 5. Default Target ---
 .PHONY: all
-all: dirs $(LIB_STATIC) $(TCC_BIN) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TCC_BIN) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
 # --- 6. Directory Creation ---
@@ -72,9 +91,9 @@ dirs:
 # sysroot paths here. The AIC headers are added when TCC compiles user code.
 $(TCC_BIN):
 	@echo "[AIC] Configuring TinyCC..."
-	@cd $(TCC_DIR) && ./configure --cc=$(CC) --prefix=$(AIC_ROOT)/build/tcc
+	@cd $(TCC_DIR) && ./configure $(TCC_CONFFLAGS)
 	@echo "[AIC] Compiling TinyCC..."
-	@$(MAKE) -C $(TCC_DIR) -j$(shell nproc)
+	@./scripts/x86-tcc.sh $(CC) $(ARCFLAGS)
 
 # --- 8. Library Build Rules ---
 $(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)
@@ -83,7 +102,8 @@ $(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)
 
 $(LIB_SHARED): $(ALL_OBJS) $(STARTUP_OBJ)
 	@echo "[LD] $@ (shared)"
-	@$(CC) -shared -o $@ $(ALL_OBJS) $(STARTUP_OBJ)
+	@echo $(CC) -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
+	@$(CC) -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
 
 $(LIBC_A): $(LIB_STATIC)
 	@echo "[CP] $@"
@@ -107,17 +127,20 @@ $(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.c
 $(OBJ_DIR)/arch/$(ARCH)/crt1.o: src/arch/$(ARCH)/crt1.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
+	@echo $(CC) $(ASFLAGS) -c $< -o $@
 	@$(CC) $(ASFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.S
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@$(CC) $(ASFLAGS) -c $< -o $@
+	@echo $(CC) $(ASFLAGS) -c $< -o $@
+	@$(CC) $(ASFLAGS)  -c $< -o $@
 
 $(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@$(CC) $(ASFLAGS) -c $< -o $@
+	@echo $(CC) $(ASFLAGS)  -c $< -o $@
+	@$(CC) $(ASFLAGS)  -c $< -o $@
 
 # --- 10. Test Binary Rules ---
 build/tests/%.o: tests/%.c $(TCC_BIN)
@@ -128,7 +151,7 @@ build/tests/%.o: tests/%.c $(TCC_BIN)
 bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
 	@mkdir -p bin
 	@echo "[LD] $@"
-	@$(LD) -static -pie --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
+	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
 
 # --- 11. Sysroot Installation ---
 .PHONY: install install-sysroot sysroot
@@ -218,12 +241,8 @@ clean:
 	@rm -rf $(BUILD_DIR) bin
 	@if [ -d "$(TCC_DIR)" ]; then $(MAKE) -C $(TCC_DIR) clean; fi
 	@rm -rf $(SYSROOT_DIR)
-	@echo "[AIC] Cleaned."
-
-.PHONY: distclean
-distclean: clean
 	@rm -rf $(BUILD_DIR)
-	@echo "[AIC] Full clean."
+	@echo "[AIC] Fully cleaned."
 
 # --- 17. Help Target ---
 .PHONY: help
@@ -238,7 +257,6 @@ help:
 	@echo "    all           Build everything (default)"
 	@echo "    debug         Build with debug symbols"
 	@echo "    clean         Remove build artifacts"
-	@echo "    distclean     Remove all generated files"
 	@echo ""
 	@echo "  Installation Targets:"
 	@echo "    sysroot       Generate sysroot at ./sysroot (quick)"

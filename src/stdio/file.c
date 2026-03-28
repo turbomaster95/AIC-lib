@@ -102,24 +102,15 @@ FILE *fdopen(int fd, const char *mode) {
 }
 
 int fclose(FILE *stream) {
-    if (stream == NULL) {
-        return EOF;
-    }
-    
+    if (!stream) return EOF;
     FILE_impl *f = (FILE_impl *)stream;
     
-    /* Flush if writable */
-    if (f->fd == STDOUT_FILENO || f->fd == STDERR_FILENO) {
-        fflush(stream);
+    if (f->fd != -1) {
+        close(f->fd); // Use your unistd.h wrapper
+        f->fd = -1;   // Mark THIS specific slot as free
+        return 0;
     }
-    
-    /* Close the fd */
-    if (f->fd >= 0 && f->fd < 32) {
-        __syscall1(SYS_close, f->fd);
-        file_table[f->fd].fd = -1;
-    }
-    
-    return 0;
+    return EOF;
 }
 
 int fileno(FILE *stream) {
@@ -178,3 +169,19 @@ char *fgets(char *s, int size, FILE *stream) {
     s[i] = '\0';
     return s;
 }
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    if (!ptr || !stream) return 0;
+    FILE_impl *f = (FILE_impl *)stream;
+    
+    size_t total = size * nmemb;
+    // Direct syscall for now since you don't have buffers yet
+    long ret = __syscall3(SYS_write, f->fd, (long)ptr, total);
+    
+    if (ret < 0) {
+        f->error = 1;
+        return 0;
+    }
+    return (size_t)ret / size;
+}
+

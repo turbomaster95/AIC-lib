@@ -123,7 +123,25 @@
         );
         return ret;
     }
-
+#elif defined(__i386__)
+    /**
+     * i386 ABI (Linux):
+     * eax: syscall number
+     * ebx, ecx, edx, esi, edi, ebp: arguments 1-6
+     */
+    static inline long __syscall_gen(long n, long a, long b, long c, long d, long e, long f) {
+        long ret;
+        __asm__ volatile (
+            "pushl %%ebp\n\t"      // Save ebp (it's a callee-saved reg and used for arg 6)
+            "movl %7, %%ebp\n\t"   // Load 6th argument into ebp
+            "int $0x80\n\t"        // Trigger syscall
+            "popl %%ebp"           // Restore ebp
+            : "=a"(ret)
+            : "a"(n), "b"(a), "c"(b), "d"(c), "S"(d), "D"(e), "m"(f)
+            : "memory"
+        );
+        return ret;
+    }
 #elif defined(__aarch64__)
     /**
      * AArch64 ABI:

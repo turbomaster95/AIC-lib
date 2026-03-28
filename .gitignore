@@ -2,3 +2,4 @@ build/
 *.d
 bin/
 sysroot/
+third_party/tinycc

@@ -5,7 +5,10 @@
 #include <stdarg.h>
 
 /* File descriptor type */
-typedef int FILE;
+typedef struct {
+    int fd;
+    // You can add buffer fields here later
+} FILE;
 
 /* Standard file descriptors */
 extern FILE *stdin;

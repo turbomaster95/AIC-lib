@@ -26,8 +26,7 @@ int putc(int c, FILE *stream) {
 }
 
 int fputc(int c, FILE *stream) {
-    int fd = (stream != NULL) ? *stream : STDOUT_FILENO;
-    
+    int fd = (stream != NULL) ? stream->fd : STDOUT_FILENO;    
     /* stderr is unbuffered */
     if (fd == STDERR_FILENO) {
         char ch = (char)c;
@@ -53,7 +52,7 @@ int fputc(int c, FILE *stream) {
 }
 
 int fputs(const char *s, FILE *stream) {
-    int fd = (stream != NULL) ? *stream : STDOUT_FILENO;
+    int fd = (stream != NULL) ? stream->fd : STDOUT_FILENO;
     size_t len = 0;
     const char *p = s;
     
