@@ -111,4 +111,8 @@ int linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath,
 int symlinkat(const char *target, int newdirfd, const char *linkpath);
 ssize_t readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 
+/* Bios-Nim specific syscalls */
+unsigned long uptime(void);
+void clearScreen(void);
+
 #endif /* _UNISTD_H */

@@ -100,10 +100,14 @@
 #define SYS_fsync        __NR_fsync
 #define SYS_fdatasync    __NR_fdatasync
 
+/* Bios-Nim Extensions */
+#define SYS_uptime       __NR_uptime
+#define SYS_clearScreen  __NR_clear
+
 /* * 2. Architecture-Specific Assembly Triggers
  */
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__x86_64_efi__)
     /**
      * x86_64 ABI:
      * rax: syscall number

@@ -36,6 +36,10 @@ else
     ARCFLAGS += -m64
 endif
 
+ifeq ($(ARCH),x86_64-efi)
+    ARCFLAGS += -D__x86_64_efi__
+endif
+
 CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
 CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
@@ -305,6 +309,8 @@ help:
 	@echo "    build/lib/libc.so    - Alias (libc-compatible)"
 	@echo "    sysroot/             - Complete sysroot with headers & libs"
 	@echo "    build/aic-<arch>.tar.gz - Distributable package"
+	@echo ""
+	@echo "  Available architectures: x86_64-efi, aarch64, x86_64, i386(or x86)"
 	@echo ""
 	@echo "============================================================================="
 
