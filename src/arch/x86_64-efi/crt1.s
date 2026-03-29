@@ -12,8 +12,12 @@ _start:
     # Align the stack to 16 bytes for C
     and $-16, %rsp
     
-    call _start_c       # Call AIC's C entry point
-
-_hang:
-    hlt                 # Halt the CPU if main returns
+    call _start_c       # Call AIC's C entry point (calls main)
+    
+    # At this point, RAX contains the return value of main.
+    # We pass it as the first argument (RDI) to exit().
+    mov %rax, %rdi
+    call exit           # Call the exit syscall wrapper
+    
+_hang:                  # Fallback in case exit fails
     jmp _hang

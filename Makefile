@@ -61,7 +61,11 @@ LIBC_SO     = $(LIB_DIR)/libc.so
 TCC_DIR     = $(AIC_ROOT)/third_party/tinycc
 TCC_BIN     = $(TCC_DIR)/tcc
 TCC_CC   = gcc   # set it to $(AIC_ROOT)/scripts/aic-gcc after all the headers and things are done :)
-TCC_CONFFLAGS = --cc=$(TCC_CC) --prefix=$(AIC_ROOT)/build/tcc --cpu=$(ARCH) --extra-cflags="$(ARCFLAGS)" --extra-ldflags="$(ARCFLAGS)"
+TCC_CPU  = $(ARCH)
+ifeq ($(ARCH),x86_64-efi)
+    TCC_CPU = x86_64
+endif
+TCC_CONFFLAGS = --cc=$(TCC_CC) --prefix=$(AIC_ROOT)/build/tcc --cpu=$(TCC_CPU) --extra-cflags="$(ARCFLAGS)" --extra-ldflags="$(ARCFLAGS)"
 
 # --- 3. Automatic Source Discovery ---
 SRCS        = $(shell find src -name "*.c" ! -path "*/arch/*/*")

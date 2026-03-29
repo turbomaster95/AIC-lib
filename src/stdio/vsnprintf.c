@@ -10,18 +10,38 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
     while (*p && i < size - 1) {
         if (*p == '%') {
             p++;
+            int is_long = 0;
+            if (*p == 'l') {
+                is_long = 1;
+                p++;
+            }
+
             switch (*p) {
                 case 'd': {
-                    int val = va_arg(ap, int);
-                    itoa(val, buf, 10);
-                    for (size_t j = 0; buf[j] && i < size - 1; j++) {
-                        str[i++] = buf[j];
+                    long val = is_long ? va_arg(ap, long) : (long)va_arg(ap, int);
+                    if (val < 0) {
+                        if (i < size - 1) str[i++] = '-';
+                        val = -val;
+                    }
+                    unsigned long uval = (unsigned long)val;
+                    char *digits = "0123456789";
+                    char *dp = buf + sizeof(buf) - 1;
+                    *dp = '\0';
+                    if (uval == 0) {
+                        *--dp = '0';
+                    } else {
+                        while (uval > 0) {
+                            *--dp = digits[uval % 10];
+                            uval /= 10;
+                        }
+                    }
+                    for (size_t j = 0; dp[j] && i < size - 1; j++) {
+                        str[i++] = dp[j];
                     }
                     break;
                 }
                 case 'u': {
-                    unsigned int val = va_arg(ap, unsigned int);
-                    /* For unsigned, we need a different conversion */
+                    unsigned long val = is_long ? va_arg(ap, unsigned long) : (unsigned long)va_arg(ap, unsigned int);
                     char *digits = "0123456789";
                     char *dp = buf + sizeof(buf) - 1;
                     *dp = '\0';
@@ -39,7 +59,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
                     break;
                 }
                 case 'x': {
-                    unsigned int val = va_arg(ap, unsigned int);
+                    unsigned long val = is_long ? va_arg(ap, unsigned long) : (unsigned long)va_arg(ap, unsigned int);
                     char *digits = "0123456789abcdef";
                     char *dp = buf + sizeof(buf) - 1;
                     *dp = '\0';
@@ -107,9 +127,8 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
                 default: {
                     /* Unknown format specifier, copy literally */
                     str[i++] = '%';
-                    if (i < size - 1) {
-                        str[i++] = *p;
-                    }
+                    if (is_long && i < size - 1) str[i++] = 'l';
+                    if (i < size - 1) str[i++] = *p;
                     break;
                 }
             }

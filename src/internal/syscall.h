@@ -101,8 +101,11 @@
 #define SYS_fdatasync    __NR_fdatasync
 
 /* Bios-Nim Extensions */
-#define SYS_uptime       __NR_uptime
-#define SYS_clearScreen  __NR_clear
+#if defined(__x86_64_efi__)
+	#define SYS_uptime       __NR_uptime
+	#define SYS_clearScreen  __NR_clear
+	#define SYS_spawn        __NR_spawn
+#endif
 
 /* * 2. Architecture-Specific Assembly Triggers
  */

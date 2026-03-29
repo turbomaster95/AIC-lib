@@ -17,6 +17,7 @@
 #define __NR_write_file     68
 #define __NR_clear          69
 #define __NR_execve         70   /* Maps to kernel exec */
+#define __NR_spawn          71
 
 /* Common dummy aliases for AIC - mapped to -1 (unsupported) */
 #define __NR_open           -1
