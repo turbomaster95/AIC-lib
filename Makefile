@@ -8,6 +8,7 @@
 # --- 1. Identity & Architecture Detection ---
 ARCH   ?= $(shell uname -m)
 CC      = gcc
+HOSTCC  = gcc
 AR      = ar
 LD      = ld.lld
 OBJCOPY = objcopy
@@ -60,7 +61,7 @@ LIBC_SO     = $(LIB_DIR)/libc.so
 # --- 2a. TinyCC part ---
 TCC_DIR     = $(AIC_ROOT)/third_party/tinycc
 TCC_BIN     = $(TCC_DIR)/tcc
-TCC_CC   = gcc   # set it to $(AIC_ROOT)/scripts/aic-gcc after all the headers and things are done :)
+TCC_CC   = $(HOSTCC)   # set it to $(AIC_ROOT)/scripts/aic-gcc after all the headers and things are done :)
 TCC_CPU  = $(ARCH)
 ifeq ($(ARCH),x86_64-efi)
     TCC_CPU = x86_64
@@ -84,6 +85,17 @@ STARTUP_OBJ = $(OBJ_DIR)/arch/$(ARCH)/crt1.o
 TEST_BINS   = $(TEST_SRCS:tests/%.c=bin/%)
 DEPS        = $(ALL_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
 
+ifeq ($(ARCH),x86_64)
+    # This tells GCC to act as a cross-compiler for x86_64
+    TARGET_FLAGS = -target x86_64-linux-gnu -nostdlib
+
+    # Apply it to your compilation variables
+    CFLAGS   += $(TARGET_FLAGS)
+    ASFLAGS  += $(TARGET_FLAGS)
+    LDFLAGS  += $(TARGET_FLAGS)
+    ARCFLAGS += $(TARGET_FLAGS)
+endif
+
 # --- 5. Default Target ---
 .PHONY: all
 all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TCC_BIN) $(TEST_BINS)
@@ -101,7 +113,7 @@ $(TCC_BIN):
 	@echo "[AIC] Configuring TinyCC..."
 	@cd $(TCC_DIR) && ./configure $(TCC_CONFFLAGS)
 	@echo "[AIC] Compiling TinyCC..."
-	@./scripts/x86-tcc.sh $(CC) $(ARCFLAGS)
+	@./scripts/x86-tcc.sh $(HOSTCC) # $(ARCFLAGS)
 
 # --- 8. Library Build Rules ---
 $(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)

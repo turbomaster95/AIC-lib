@@ -4,10 +4,12 @@
 #include <fcntl.h>
 
 /* For AArch64 and x86_64-efi, use newfstatat syscall */
-#if defined(__aarch64__) || defined(__x86_64_efi__)
-#define SYS_newfstatat __NR_newfstatat
+/* Use the modern newfstatat syscall for 64-bit architectures */
+#if defined(__aarch64__) || defined(__x86_64__) || defined(__x86_64_efi__)
+    #define SYS_newfstatat __NR_newfstatat
 #else
-#define SYS_newfstatat __NR_fstatat64
+    /* Fallback for 32-bit archs (ARM32, i386) which need the '64' suffix for large file support */
+    #define SYS_newfstatat __NR_fstatat64
 #endif
 
 int stat(const char *pathname, struct stat *statbuf) {
