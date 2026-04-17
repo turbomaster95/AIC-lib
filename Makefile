@@ -17,6 +17,7 @@ IS_ANDROID = $(shell uname -o | grep -qi "android" && echo yes || echo no)
 # Define PIE flags only if needed
 ifeq ($(IS_ANDROID),yes)
     PIE_LDFLAGS = -pie
+    CC = clang
     # Note: For Android, we also usually need to specify the 
     # page size for the ELF header if it's modern Android.
     # PIE_LDFLAGS += -z max-page-size=4096
@@ -96,6 +97,30 @@ ifeq ($(ARCH),x86_64)
     ARCFLAGS += $(TARGET_FLAGS)
 endif
 
+ifeq ($(ARCH),x86_64-efi)
+    # This tells GCC to act as a cross-compiler for x86_64
+    TARGET_FLAGS = -target x86_64-linux-gnu -nostdlib
+
+    # Apply it to your compilation variables
+    CFLAGS   += $(TARGET_FLAGS)
+    ASFLAGS  += $(TARGET_FLAGS)
+    LDFLAGS  += $(TARGET_FLAGS)
+    ARCFLAGS += $(TARGET_FLAGS)
+endif
+
+# --- Override ---
+ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
+    # 1. Check for Android specifically within the x86 branch
+    ifeq ($(IS_ANDROID),yes)
+        PLAT_FLAGS := -target i686-linux-gnu -fPIC
+	TCCFLAGS += -fPIC
+    endif
+endif
+OCFLAGS =
+CFLAGS += $(OCFLAGS) $(PLAT_FLAGS)
+ARCFLAGS += $(PLAT_FLAGS)
+ASFLAGS += $(PLAT_FLAGS)
+
 # --- 5. Default Target ---
 .PHONY: all
 all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TCC_BIN) $(TEST_BINS)
@@ -123,7 +148,7 @@ $(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)
 $(LIB_SHARED): $(ALL_OBJS) $(STARTUP_OBJ)
 	@echo "[LD] $@ (shared)"
 	@echo $(CC) -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
-	@$(CC) -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
+	@$(CC) -nostdlib -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
 
 $(LIBC_A): $(LIB_STATIC)
 	@echo "[CP] $@"
@@ -166,12 +191,13 @@ $(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.s
 build/tests/%.o: tests/%.c $(TCC_BIN)
 	@mkdir -p $(dir $@)
 	@echo "[TEST-CC] $<"
-	@$(TCC_BIN) $(TCCFLAGS) -c $< -o $@
+	@echo $(TCC_BIN) $(TCCFLAGS) $(PIE_LDFLAGS) -c $< -o $@
+	@$(TCC_BIN) $(TCCFLAGS) $(PIE_LDFLAGS) -c $< -o $@
 
 bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
 	@mkdir -p bin
 	@echo "[LD] $@"
-	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
+	@$(LD) -static -z notext $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
 
 # --- 11. Sysroot Installation ---
 .PHONY: install install-sysroot sysroot
@@ -245,7 +271,7 @@ run: all $(TCC_BIN)
 		-I$(AIC_ROOT)/include \
 		-I$(TCC_DIR)/include \
 		-c tests/$(T).c -o build/tests/$(T).o
-	@$(LD) -static -pie --no-dynamic-linker $(STARTUP_OBJ) build/tests/$(T).o $(LIB_STATIC) -o bin/$(T)
+	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) build/tests/$(T).o $(LIB_STATIC) -o bin/$(T)
 	@echo "[AIC] Running bin/$(T):"
 	@./bin/$(T)
 
