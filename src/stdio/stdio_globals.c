@@ -1,10 +1,5 @@
 #include <stdio.h>
 
-/* 
- * Standard file descriptors
- * In AIC, FILE* is just an int wrapper for simplicity.
- * These point to the standard POSIX file descriptors.
- */
 static FILE _stdin  = { STDIN_FILENO };
 static FILE _stdout = { STDOUT_FILENO };
 static FILE _stderr = { STDERR_FILENO };

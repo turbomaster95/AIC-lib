@@ -11,7 +11,7 @@ void flush(void) {
     if (buf_idx > 0) {
         long ret = pal_write(STDOUT_FILENO, (void*)stdout_buf, (long)buf_idx);
         if (ret < 0) {
-            /* Error handling could set errno here */
+	   errno = -1;
         }
         buf_idx = 0;
     }
@@ -85,9 +85,3 @@ int fprintf(FILE *stream, const char *format, ...) {
     return len;
 }
 
-int vprintf(const char *format, va_list ap) {
-    char buffer[1024];
-    int len = vsnprintf(buffer, sizeof(buffer), format, ap);
-    print_str(buffer);
-    return len;
-}

@@ -8,6 +8,7 @@ extern char *optarg;
 extern int optind;
 extern int opterr;
 extern int optopt;
+extern int optreset;
 
 /* option structure for getopt_long */
 struct option {

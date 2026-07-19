@@ -33,7 +33,13 @@ typedef long fpos_t;
 /* Function declarations */
 int printf(const char *format, ...);
 int fprintf(FILE *stream, const char *format, ...);
+int vasprintf(char **strp, const char *format, va_list ap);
+int asprintf(char **strp, const char *format, ...);
 int vprintf(const char *format, va_list ap);
+int sprintf(char *str, const char *format, ...);
+int snprintf(char *str, size_t size, const char *format, ...);
+int vdprintf(int fd, const char *format, va_list ap);
+int dprintf(int fd, const char *format, ...);
 int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 int putchar(int c);
 int getchar(void);
@@ -55,6 +61,7 @@ FILE *fdopen(int fd, const char *mode);
 FILE *freopen(const char *pathname, const char *mode, FILE *stream);
 int fclose(FILE *stream);
 int fileno(FILE *stream);
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
 
 /* Formatted input */
 int scanf(const char *format, ...);

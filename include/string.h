@@ -31,5 +31,6 @@ size_t strspn(const char *s, const char *accept);
 size_t strcspn(const char *s, const char *reject);
 char *strpbrk(const char *s, const char *accept);
 char *itoa(long val, char *buf, int base);
+char *strerror(int errnum);
 
 #endif

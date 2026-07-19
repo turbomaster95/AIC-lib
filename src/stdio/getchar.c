@@ -14,6 +14,5 @@ int getchar(void) {
         in_len = (int)n;
         in_ptr = 0;
     }
-    
     return (unsigned char)in_buf[in_ptr++];
 }

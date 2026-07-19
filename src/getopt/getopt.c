@@ -1,199 +1,210 @@
-#include <getopt.h>
-#include <string.h>
+#include <stddef.h>
 #include <stdio.h>
+#include <string.h>
+#include <getopt.h>
 
-/* Global variables */
-char *optarg = NULL;
-int optind = 1;
-int opterr = 1;
-int optopt = 0;
+char *optarg;
+int optind=1, opterr=1, optopt, __optpos, optreset=0;
 
-static int optpos = 1;
+#define optpos __optpos
 
-int getopt(int argc, char *const argv[], const char *optstring) {
-    char *opt;
-    char c;
-    
-    optarg = NULL;
-    
-    if (optind == 0) {
-        optind = 1;
-        optpos = 1;
-    }
-    
-    if (optind >= argc || argv[optind] == NULL || argv[optind][0] != '-') {
-        return -1;
-    }
-    
-    if (strcmp(argv[optind], "--") == 0) {
-        optind++;
-        return -1;
-    }
-    
-    c = argv[optind][optpos];
-    
-    if (c == '\0') {
-        optind++;
-        optpos = 1;
-        return getopt(argc, argv, optstring);
-    }
-    
-    if (c == ':') {
-        if (opterr) {
-            fprintf(stderr, "%s: invalid option -- ':'\n", argv[0]);
-        }
-        optopt = c;
-        optind++;
-        optpos = 1;
-        return '?';
-    }
-    
-    opt = strchr(optstring, c);
-    
-    if (opt == NULL || c == '?') {
-        if (opterr) {
-            fprintf(stderr, "%s: invalid option -- '%c'\n", argv[0], c);
-        }
-        optopt = c;
-        optpos++;
-        if (argv[optind][optpos] == '\0') {
-            optind++;
-            optpos = 1;
-        }
-        return '?';
-    }
-    
-    optpos++;
-    
-    if (opt[1] == ':') {
-        if (optpos >= (int)strlen(argv[optind])) {
-            optind++;
-            optpos = 1;
-            if (optind >= argc) {
-                if (opt[2] != ':') {
-                    if (opterr) {
-                        fprintf(stderr, "%s: option requires an argument -- '%c'\n", argv[0], c);
-                    }
-                    optopt = c;
-                    return '?';
-                }
-            } else {
-                optarg = argv[optind];
-                optind++;
-                optpos = 1;
-            }
-        } else {
-            optarg = argv[optind] + optpos;
-            optind++;
-            optpos = 1;
-        }
-    }
-    
-    if (argv[optind] == NULL || argv[optind][optpos] == '\0') {
-        optind++;
-        optpos = 1;
-    }
-    
-    return c;
+static void __getopt_msg(const char *a, const char *b, const char *c, size_t l)
+{
+	FILE *f = stderr;
+	fputs(a, f);
+	fwrite(b, strlen(b), 1, f);
+	fwrite(c, 1, l, f);
+	fputc('\n', f);
 }
 
-int getopt_long(int argc, char *const argv[], const char *optstring, const struct option *longopts, int *longindex) {
-    char *longopt;
-    size_t len;
-    int i;
-    
-    optarg = NULL;
-    
-    if (optind == 0) {
-        optind = 1;
-        optpos = 1;
-    }
-    
-    if (optind >= argc || argv[optind] == NULL) {
-        return -1;
-    }
-    
-    /* Check for long option */
-    if (strncmp(argv[optind], "--", 2) == 0) {
-        longopt = argv[optind] + 2;
-        
-        if (*longopt == '\0') {
-            optind++;
-            return -1;
-        }
-        
-        len = strcspn(longopt, "=");
-        
-        for (i = 0; longopts[i].name != NULL; i++) {
-            if (strncmp(longopt, longopts[i].name, len) == 0 && 
-                strlen(longopts[i].name) == len) {
-                
-                if (longindex) {
-                    *longindex = i;
-                }
-                
-                if (longopts[i].has_arg == required_argument) {
-                    char *eq = strchr(longopt, '=');
-                    if (eq) {
-                        optarg = eq + 1;
-                    } else {
-                        optind++;
-                        if (optind < argc) {
-                            optarg = argv[optind];
-                        } else {
-                            if (opterr) {
-                                fprintf(stderr, "%s: option '--%s' requires an argument\n", argv[0], longopts[i].name);
-                            }
-                            optopt = longopts[i].val;
-                            return '?';
-                        }
-                    }
-                    optind++;
-                } else if (longopts[i].has_arg == optional_argument) {
-                    char *eq = strchr(longopt, '=');
-                    if (eq) {
-                        optarg = eq + 1;
-                    }
-                    optind++;
-                } else {
-                    optind++;
-                }
-                
-                return longopts[i].flag ? (*longopts[i].flag = longopts[i].val, 0) : longopts[i].val;
-            }
-        }
-        
-        if (opterr) {
-            fprintf(stderr, "%s: unrecognized option '--%s'\n", argv[0], longopt);
-        }
-        optopt = 0;
-        optind++;
-        return '?';
-    }
-    
-    /* Check for short option */
-    if (argv[optind][0] == '-' && argv[optind][1] != '\0') {
-        return getopt(argc, argv, optstring);
-    }
-    
-    return -1;
+int getopt(int argc, char * const argv[], const char *optstring)
+{
+	int i, c, d;
+	int k, l;
+	char *optchar;
+
+	if (!optind || optreset) {
+		optreset = 0;
+		__optpos = 0;
+		optind = 1;
+	}
+
+	if (optind >= argc || !argv[optind])
+		return -1;
+
+	if (argv[optind][0] != '-') {
+		if (optstring[0] == '-') {
+			optarg = argv[optind++];
+			return 1;
+		}
+		return -1;
+	}
+
+	if (!argv[optind][1])
+		return -1;
+
+	if (argv[optind][1] == '-' && !argv[optind][2])
+		return optind++, -1;
+
+	if (!optpos) optpos++;
+	c = argv[optind][optpos], k = 1;
+	optchar = argv[optind]+optpos;
+	optopt = c;
+	optpos += k;
+
+	if (!argv[optind][optpos]) {
+		optind++;
+		optpos = 0;
+	}
+
+	if (optstring[0] == '-' || optstring[0] == '+')
+		optstring++;
+
+	i = 0;
+	d = 0;
+	do {
+		d = optstring[i], l = 1;
+		if (l>0) i+=l; else i++;
+	} while (l && d != c);
+
+	if (d != c) {
+		if (optstring[0] != ':' && opterr)
+			__getopt_msg(argv[0], ": unrecognized option: ", optchar, k);
+		return '?';
+	}
+	if (optstring[i] == ':') {
+		if (optstring[i+1] == ':') optarg = 0;
+		else if (optind >= argc) {
+			if (optstring[0] == ':') return ':';
+			if (opterr) __getopt_msg(argv[0],
+				": option requires an argument: ",
+				optchar, k);
+			return '?';
+		}
+		if (optstring[i+1] != ':' || optpos) {
+			optarg = argv[optind++] + optpos;
+			optpos = 0;
+		}
+	}
+	return c;
 }
 
-int getopt_long_only(int argc, char *const argv[], const char *optstring, const struct option *longopts, int *longindex) {
-    /* Similar to getopt_long but accepts single dash for long options */
-    if (optind < argc && argv[optind] != NULL && strncmp(argv[optind], "--", 2) != 0 && 
-        argv[optind][0] == '-' && argv[optind][1] != '\0') {
-        /* Could be a long option with single dash - check if it matches */
-        char *longopt = argv[optind] + 1;
-        size_t len = strcspn(longopt, "=");
-        
-        for (int i = 0; longopts[i].name != NULL; i++) {
-            if (strncmp(longopt, longopts[i].name, len) == 0 && 
-                strlen(longopts[i].name) == len) {
-                return getopt_long(argc, argv, optstring, longopts, longindex);
-            }
-        }
-    }
-    
-    return getopt_long(argc, argv, optstring, longopts, longindex);
+static void permute(char *const *argv, int dest, int src)
+{
+	char **av = (char **)argv;
+	char *tmp = av[src];
+	int i;
+	for (i=src; i>dest; i--)
+		av[i] = av[i-1];
+	av[dest] = tmp;
+}
+
+static int __getopt_long_core(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *idx, int longonly)
+{
+	optarg = 0;
+	if (longopts && argv[optind][0] == '-' &&
+		((longonly && argv[optind][1] && argv[optind][1] != '-') ||
+		 (argv[optind][1] == '-' && argv[optind][2])))
+	{
+		int colon = optstring[optstring[0]=='+'||optstring[0]=='-']==':';
+		int i, cnt, match = -1;
+		char *opt;
+		for (cnt=i=0; longopts[i].name; i++) {
+			const char *name = longopts[i].name;
+			opt = argv[optind]+1;
+			if (*opt == '-') opt++;
+			for (; *name && *name == *opt; name++, opt++);
+			if (*opt && *opt != '=') continue;
+			match = i;
+			if (!*name) {
+				cnt = 1;
+				break;
+			}
+			cnt++;
+		}
+		if (cnt==1) {
+			i = match;
+			optind++;
+			optopt = longopts[i].val;
+			if (*opt == '=') {
+				if (!longopts[i].has_arg) {
+					if (colon || !opterr)
+						return '?';
+					__getopt_msg(argv[0],
+						": option does not take an argument: ",
+						longopts[i].name,
+						strlen(longopts[i].name));
+					return '?';
+				}
+				optarg = opt+1;
+			} else if (longopts[i].has_arg == required_argument) {
+				if (!(optarg = argv[optind])) {
+					if (colon) return ':';
+					if (!opterr) return '?';
+					__getopt_msg(argv[0],
+						": option requires an argument: ",
+						longopts[i].name,
+						strlen(longopts[i].name));
+					return '?';
+				}
+				optind++;
+			}
+			if (idx) *idx = i;
+			if (longopts[i].flag) {
+				*longopts[i].flag = longopts[i].val;
+				return 0;
+			}
+			return longopts[i].val;
+		}
+		if (argv[optind][1] == '-') {
+			if (!colon && opterr)
+				__getopt_msg(argv[0], cnt ?
+					": option is ambiguous: " :
+					": unrecognized option: ",
+					argv[optind]+2,
+					strlen(argv[optind]+2));
+			optind++;
+			return '?';
+		}
+	}
+	return getopt(argc, argv, optstring);
+}
+
+static int __getopt_long(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *idx, int longonly)
+{
+	int ret, skipped, resumed;
+	if (!optind || optreset) {
+		optreset = 0;
+		__optpos = 0;
+		optind = 1;
+	}
+	if (optind >= argc || !argv[optind]) return -1;
+	skipped = optind;
+	if (optstring[0] != '+' && optstring[0] != '-') {
+		int i;
+		for (i=optind; ; i++) {
+			if (i >= argc || !argv[i]) return -1;
+			if (argv[i][0] == '-' && argv[i][1]) break;
+		}
+		optind = i;
+	}
+	resumed = optind;
+	ret = __getopt_long_core(argc, argv, optstring, longopts, idx, longonly);
+	if (resumed > skipped) {
+		int i, cnt = optind-resumed;
+		for (i=0; i<cnt; i++)
+			permute(argv, skipped, optind-1);
+		optind = skipped + cnt;
+	}
+	return ret;
+}
+
+int getopt_long(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *idx)
+{
+	return __getopt_long(argc, argv, optstring, longopts, idx, 0);
+}
+
+int getopt_long_only(int argc, char *const *argv, const char *optstring, const struct option *longopts, int *idx)
+{
+	return __getopt_long(argc, argv, optstring, longopts, idx, 1);
 }

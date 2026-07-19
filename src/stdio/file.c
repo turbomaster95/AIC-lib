@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <errno.h>
 #include <string.h>
 
-/* Simple FILE wrapper - in a real libc this would be more complex */
 typedef struct {
     int fd;
     int flags;
@@ -13,22 +12,18 @@ typedef struct {
     int eof;
 } FILE_impl;
 
-/* We need to store FILE_impl somewhere - for now use a simple approach */
-/* In production code, you'd want a proper file descriptor table */
-
 static FILE_impl file_table[32];
 static int file_table_initialized = 0;
 
 FILE *fopen(const char *pathname, const char *mode) {
     int flags = 0;
     int mode_bits = 0644;  /* Default permissions: rw-r--r-- */
-    
     /* Parse mode string */
     if (mode == NULL) {
         errno = EINVAL;
         return NULL;
     }
-    
+
     /* Basic mode parsing */
     if (strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
         flags = O_RDONLY;
@@ -46,12 +41,10 @@ FILE *fopen(const char *pathname, const char *mode) {
         errno = EINVAL;
         return NULL;
     }
-    
     int fd = open(pathname, flags, mode_bits);
     if (fd < 0) {
         return NULL;
     }
-    
     /* Find a free slot in file table */
     if (!file_table_initialized) {
         for (int i = 0; i < 32; i++) {
@@ -59,7 +52,6 @@ FILE *fopen(const char *pathname, const char *mode) {
         }
         file_table_initialized = 1;
     }
-    
     for (int i = 0; i < 32; i++) {
         if (file_table[i].fd == -1) {
             file_table[i].fd = fd;
@@ -69,7 +61,6 @@ FILE *fopen(const char *pathname, const char *mode) {
             return (FILE *)&file_table[i];
         }
     }
-    
     /* No free slots */
     errno = EMFILE;
     close(fd);
@@ -77,16 +68,13 @@ FILE *fopen(const char *pathname, const char *mode) {
 }
 
 FILE *fdopen(int fd, const char *mode) {
-    /* Similar to fopen but uses existing fd */
-    (void)mode;  /* Mode parsing omitted for brevity */
-    
+    (void)mode;
     if (!file_table_initialized) {
         for (int i = 0; i < 32; i++) {
             file_table[i].fd = -1;
         }
         file_table_initialized = 1;
     }
-    
     for (int i = 0; i < 32; i++) {
         if (file_table[i].fd == -1) {
             file_table[i].fd = fd;
@@ -96,7 +84,6 @@ FILE *fdopen(int fd, const char *mode) {
             return (FILE *)&file_table[i];
         }
     }
-    
     errno = EMFILE;
     return NULL;
 }
@@ -104,9 +91,8 @@ FILE *fdopen(int fd, const char *mode) {
 int fclose(FILE *stream) {
     if (!stream) return EOF;
     FILE_impl *f = (FILE_impl *)stream;
-    
     if (f->fd != -1) {
-        close(f->fd); // Use your unistd.h wrapper
+        close(f->fd);
         f->fd = -1;   // Mark THIS specific slot as free
         return 0;
     }
@@ -118,7 +104,6 @@ int fileno(FILE *stream) {
         errno = EBADF;
         return -1;
     }
-    
     FILE_impl *f = (FILE_impl *)stream;
     return f->fd;
 }
@@ -128,7 +113,7 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
     if (stream != NULL) {
         fclose(stream);
     }
-    
+
     /* Open new stream */
     return fopen(pathname, mode);
 }
@@ -136,13 +121,12 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
 int fgetc(FILE *stream) {
     char c;
     int fd = (stream != NULL) ? ((FILE_impl *)stream)->fd : STDIN_FILENO;
-    
-    long ret = __syscall3(SYS_read, fd, (long)&c, 1);
+
+    long ret = pal_read(fd, (void*)&c, 1);
     if (ret <= 0) {
         ((FILE_impl *)stream)->eof = 1;
         return EOF;
     }
-    
     return (unsigned char)c;
 }
 
@@ -153,10 +137,9 @@ int getc(FILE *stream) {
 char *fgets(char *s, int size, FILE *stream) {
     int fd = (stream != NULL) ? ((FILE_impl *)stream)->fd : STDIN_FILENO;
     int i = 0;
-    
     while (i < size - 1) {
         char c;
-        long ret = __syscall3(SYS_read, fd, (long)&c, 1);
+        long ret = pal_read(fd, (void*)&c, 1);
         if (ret <= 0) {
             ((FILE_impl *)stream)->eof = 1;
             if (i == 0) return NULL;
@@ -165,7 +148,6 @@ char *fgets(char *s, int size, FILE *stream) {
         s[i++] = c;
         if (c == '\n') break;
     }
-    
     s[i] = '\0';
     return s;
 }
@@ -173,11 +155,8 @@ char *fgets(char *s, int size, FILE *stream) {
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     if (!ptr || !stream) return 0;
     FILE_impl *f = (FILE_impl *)stream;
-    
     size_t total = size * nmemb;
-    // Direct syscall for now since you don't have buffers yet
-    long ret = __syscall3(SYS_write, f->fd, (long)ptr, total);
-    
+    long ret = pal_write(f->fd, (void*)ptr, total);
     if (ret < 0) {
         f->error = 1;
         return 0;
