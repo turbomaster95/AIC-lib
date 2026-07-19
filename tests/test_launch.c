@@ -1,6 +1,7 @@
-#define USING_STD_H_OK
 #include <internal/syscall.h>
-#include <std.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int main() {
     printf("AIC Launcher v2.0\n");

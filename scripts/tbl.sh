@@ -11,11 +11,12 @@ HEADER_NAME="${2:-ARCH_SYSCALL_H}"
 
 awk -v GUARD="$HEADER_NAME" '
 BEGIN {
-  print "/* Generated from syscall_64.tbl - do not edit manually */"
+  print "/* Generated from table file - do not edit manually */"
+  print "/* ALL EDITS WILL BE LOST!! */"
   print "#ifndef " GUARD
   print "#define " GUARD
   print ""
-  print "/* x86_64 syscall numbers generated from syscall_64.tbl */"
+  print "/* Architecture syscall numbers generated from table file*/"
   print ""
 }
 # skip comments and empty lines

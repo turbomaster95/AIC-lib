@@ -5,7 +5,7 @@
 
 /* For AArch64 and x86_64-efi, use newfstatat syscall */
 /* Use the modern newfstatat syscall for 64-bit architectures */
-#if defined(__aarch64__) || defined(__x86_64__) || defined(__x86_64_efi__)
+#if defined(__aarch64__) || defined(__x86_64__)
     #define SYS_newfstatat __NR_newfstatat
 #else
     /* Fallback for 32-bit archs (ARM32, i386) which need the '64' suffix for large file support */
@@ -18,7 +18,7 @@ int stat(const char *pathname, struct stat *statbuf) {
         return -1;
     }
     
-#if defined(__aarch64__) || defined(__x86_64_efi__)
+#if defined(__aarch64__)
     long ret = __syscall4(SYS_newfstatat, (long)AT_FDCWD, (long)pathname, (long)statbuf, 0);
 #else
     long ret = __syscall4(SYS_newfstatat, (long)AT_FDCWD, (long)pathname, (long)statbuf, 0);
@@ -55,7 +55,7 @@ int lstat(const char *pathname, struct stat *statbuf) {
     }
     
     /* lstat is like stat but doesn't follow symlinks */
-#if defined(__aarch64__) || defined(__x86_64_efi__)
+#if defined(__aarch64__)
     long ret = __syscall4(SYS_newfstatat, (long)AT_FDCWD, (long)pathname, (long)statbuf, 0x100);  /* AT_SYMLINK_NOFOLLOW */
 #else
     long ret = __syscall4(SYS_newfstatat, (long)AT_FDCWD, (long)pathname, (long)statbuf, 0x100);
@@ -119,7 +119,7 @@ int mkdir(const char *pathname, int mode) {
         return -1;
     }
     
-#if defined(__aarch64__) || defined(__x86_64_efi__)
+#if defined(__aarch64__)
     long ret = __syscall3(SYS_mkdir, (long)AT_FDCWD, (long)pathname, (long)mode);
 #else
     long ret = __syscall2(SYS_mkdir, (long)pathname, (long)mode);
@@ -139,7 +139,7 @@ int rmdir(const char *pathname) {
         return -1;
     }
     
-#if defined(__aarch64__) || defined(__x86_64_efi__)
+#if defined(__aarch64__)
     long ret = __syscall2(SYS_rmdir, (long)pathname, 0);
 #else
     long ret = __syscall1(SYS_rmdir, (long)pathname);
@@ -159,7 +159,7 @@ int unlink(const char *pathname) {
         return -1;
     }
     
-#if defined(__aarch64__) || defined(__x86_64_efi__)
+#if defined(__aarch64__)
     long ret = __syscall3(SYS_unlink, (long)AT_FDCWD, (long)pathname, 0);
 #else
     long ret = __syscall1(SYS_unlink, (long)pathname);

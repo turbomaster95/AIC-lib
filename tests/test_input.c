@@ -1,5 +1,4 @@
-#define USING_STD_H_OK
-#include <std.h>
+#include <stdio.h>
 
 int main(void) {
     printf("AIC Interactive Shell (Type something and hit Enter):\n");

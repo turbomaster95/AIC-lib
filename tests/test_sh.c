@@ -1,5 +1,7 @@
-#define USING_STD_H_OK
-#include <std.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 
 int main() {
     char input[1024];

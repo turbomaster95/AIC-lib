@@ -5,9 +5,8 @@
 # Supports: x86_64, aarch64
 # =============================================================================
 
-# --- 1. Identity & Architecture Detection ---
 ARCH   ?= $(shell uname -m)
-CC      = gcc
+CC      = clang
 HOSTCC  = gcc
 AR      = ar
 LD      = ld.lld
@@ -20,12 +19,11 @@ ifeq ($(IS_ANDROID),yes)
     CC = clang
     # Note: For Android, we also usually need to specify the 
     # page size for the ELF header if it's modern Android.
-    # PIE_LDFLAGS += -z max-page-size=4096
+    PIE_LDFLAGS += -z max-page-size=4096
 else
     PIE_LDFLAGS = 
 endif
 
-# --- 2. Path Definitions ---
 AIC_ROOT    = $(shell pwd)
 PREFIX      ?= /usr/local
 SYSROOT     ?= $(AIC_ROOT)/sysroot
@@ -38,14 +36,9 @@ else
     ARCFLAGS += -m64
 endif
 
-ifeq ($(ARCH),x86_64-efi)
-    ARCFLAGS += -D__x86_64_efi__
-endif
-
 CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
 CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
-TCCFLAGS    = -D"__syscall_gen=tcc_syscall_gen" -include include/tccf/tcc_fix.h $(INCLUDES) -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC
 
 # Output paths
 BUILD_DIR   = build
@@ -59,17 +52,6 @@ LIB_SHARED  = $(LIB_DIR)/libaic.so
 LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
-# --- 2a. TinyCC part ---
-TCC_DIR     = $(AIC_ROOT)/third_party/tinycc
-TCC_BIN     = $(TCC_DIR)/tcc
-TCC_CC   = $(HOSTCC)   # set it to $(AIC_ROOT)/scripts/aic-gcc after all the headers and things are done :)
-TCC_CPU  = $(ARCH)
-ifeq ($(ARCH),x86_64-efi)
-    TCC_CPU = x86_64
-endif
-TCC_CONFFLAGS = --cc=$(TCC_CC) --prefix=$(AIC_ROOT)/build/tcc --cpu=$(TCC_CPU) --extra-cflags="$(ARCFLAGS)" --extra-ldflags="$(ARCFLAGS)"
-
-# --- 3. Automatic Source Discovery ---
 SRCS        = $(shell find src -name "*.c" ! -path "*/arch/*/*")
 ARCH_SRCS   = $(shell find -L src/arch/$(ARCH) -name "*.c" 2>/dev/null)
 ARCH_ASMS   = $(shell find -L src/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
@@ -77,7 +59,6 @@ ALL_SRCS    = $(SRCS) $(ARCH_SRCS)
 STARTUP     = src/arch/$(ARCH)/crt1.s
 TEST_SRCS   = $(wildcard tests/*.c)
 
-# --- 4. Object & Binary Mapping ---
 OBJS        = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_OBJS   = $(ARCH_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_ASM_OBJS = $(ARCH_ASMS:src/%.S=$(OBJ_DIR)/%.o)
@@ -97,23 +78,11 @@ ifeq ($(ARCH),x86_64)
     ARCFLAGS += $(TARGET_FLAGS)
 endif
 
-ifeq ($(ARCH),x86_64-efi)
-    # This tells GCC to act as a cross-compiler for x86_64
-    TARGET_FLAGS = -target x86_64-linux-gnu -nostdlib
-
-    # Apply it to your compilation variables
-    CFLAGS   += $(TARGET_FLAGS)
-    ASFLAGS  += $(TARGET_FLAGS)
-    LDFLAGS  += $(TARGET_FLAGS)
-    ARCFLAGS += $(TARGET_FLAGS)
-endif
-
 # --- Override ---
 ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
     # 1. Check for Android specifically within the x86 branch
     ifeq ($(IS_ANDROID),yes)
         PLAT_FLAGS := -target i686-linux-gnu -fPIC
-	TCCFLAGS += -fPIC
     endif
 endif
 OCFLAGS =
@@ -121,26 +90,14 @@ CFLAGS += $(OCFLAGS) $(PLAT_FLAGS)
 ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
-# --- 5. Default Target ---
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TCC_BIN) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
-# --- 6. Directory Creation ---
 .PHONY: dirs
 dirs:
 	@mkdir -p $(LIB_DIR) $(OBJ_DIR) $(SYSROOT_DIR)/include $(SYSROOT_DIR)/lib $(SYSROOT_DIR)/usr/include $(SYSROOT_DIR)/usr/lib
 
-# --- 7. TinyCC Build ---
-# Note: TCC's runtime (libtcc1.a) needs system headers, so we don't use
-# sysroot paths here. The AIC headers are added when TCC compiles user code.
-$(TCC_BIN):
-	@echo "[AIC] Configuring TinyCC..."
-	@cd $(TCC_DIR) && ./configure $(TCC_CONFFLAGS)
-	@echo "[AIC] Compiling TinyCC..."
-	@./scripts/x86-tcc.sh $(HOSTCC) # $(ARCFLAGS)
-
-# --- 8. Library Build Rules ---
 $(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)
 	@echo "[AR] $@"
 	@$(AR) rcs $@ $(ALL_OBJS)
@@ -158,7 +115,6 @@ $(LIBC_SO): $(LIB_SHARED)
 	@echo "[CP] $@"
 	@cp $< $@
 
-# --- 9. Object Compilation Rules ---
 $(OBJ_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
@@ -187,19 +143,16 @@ $(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.s
 	@echo $(CC) $(ASFLAGS)  -c $< -o $@
 	@$(CC) $(ASFLAGS)  -c $< -o $@
 
-# --- 10. Test Binary Rules ---
-build/tests/%.o: tests/%.c $(TCC_BIN)
+build/tests/%.o: tests/%.c
 	@mkdir -p $(dir $@)
 	@echo "[TEST-CC] $<"
-	@echo $(TCC_BIN) $(TCCFLAGS) $(PIE_LDFLAGS) -c $< -o $@
-	@$(TCC_BIN) $(TCCFLAGS) $(PIE_LDFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
 	@mkdir -p bin
 	@echo "[LD] $@"
-	@$(LD) -static -z notext $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
+	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
 
-# --- 11. Sysroot Installation ---
 .PHONY: install install-sysroot sysroot
 install: install-sysroot
 	@echo "[AIC] Installation complete to $(PREFIX)"
@@ -234,7 +187,6 @@ install-sysroot: all
 	@cp scripts/aic.spec $(SYSROOT_DIR)/lib/
 	@echo "[AIC] Sysroot ready at: $(SYSROOT_DIR)"
 
-# --- 12. System-wide Installation ---
 .PHONY: install-system
 install-system: all
 	@echo "[INSTALL] Installing to $(PREFIX)..."
@@ -247,7 +199,6 @@ install-system: all
 	@cp $(LIB_SHARED) $(PREFIX)/lib/libc.so
 	@echo "[AIC] Installed to $(PREFIX)"
 
-# --- 13. Package Creation ---
 .PHONY: package
 package: all install-sysroot
 	@echo "[PACKAGE] Creating AIC distribution package..."
@@ -259,38 +210,32 @@ package: all install-sysroot
 	@rm -rf $(BUILD_DIR)/package
 	@echo "[AIC] Package created: $(BUILD_DIR)/aic-$(ARCH).tar.gz"
 
-# --- 14. Convenience: Run Test ---
 T ?= test_hello
 
 .PHONY: run
-run: all $(TCC_BIN)
-	@echo "[AIC-TCC] Compiling tests/$(T).c..."
+run: all
+	@echo "[AIC-CC] Compiling tests/$(T).c..."
 	@mkdir -p bin build/tests
-	@LD_LIBRARY_PATH=$(TCC_DIR) $(TCC_BIN) -B$(TCC_DIR) \
+	@$(CC) \
 		-nostdinc -nostdlib \
 		-I$(AIC_ROOT)/include \
-		-I$(TCC_DIR)/include \
 		-c tests/$(T).c -o build/tests/$(T).o
 	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) build/tests/$(T).o $(LIB_STATIC) -o bin/$(T)
 	@echo "[AIC] Running bin/$(T):"
 	@./bin/$(T)
 
-# --- 15. Debug Build ---
 .PHONY: debug
 debug: CFLAGS = $(CFLAGS_DBG)
 debug: clean all
 	@echo "[AIC] Debug build complete."
 
-# --- 16. Cleanup ---
 .PHONY: clean
 clean:
 	@rm -rf $(BUILD_DIR) bin
-	@if [ -d "$(TCC_DIR)" ]; then $(MAKE) -C $(TCC_DIR) clean; fi
 	@rm -rf $(SYSROOT_DIR)
 	@rm -rf $(BUILD_DIR)
 	@echo "[AIC] Fully cleaned."
 
-# --- 17. Help Target ---
 .PHONY: help
 help:
 	@echo "============================================================================="
@@ -329,14 +274,6 @@ help:
 	@echo "        ./sysroot/usr/lib/crt1.o hello.c \\"
 	@echo "        -L./sysroot/usr/lib -laic -o hello"
 	@echo ""
-	@echo "  Why use the wrapper scripts?"
-	@echo "    Unlike complete toolchains (e.g. arm-linux-gnueabi-gcc), AIC is a"
-	@echo "    standalone libc. The wrappers automatically handle:"
-	@echo "    - Finding crt1.o startup files"
-	@echo "    - Linking against libaic (instead of system libc)"
-	@echo "    - Setting up include paths"
-	@echo "    - Using correct flags (-nostdlib -ffreestanding -static-pie)"
-	@echo ""
 	@echo "  Examples:"
 	@echo "    make                          # Build everything"
 	@echo "    make run T=test_malloc        # Run malloc test"
@@ -352,12 +289,10 @@ help:
 	@echo "    sysroot/             - Complete sysroot with headers & libs"
 	@echo "    build/aic-<arch>.tar.gz - Distributable package"
 	@echo ""
-	@echo "  Available architectures: x86_64-efi, aarch64, x86_64, i386(or x86)"
+	@echo "  Available architectures: aarch64, x86_64, i386 (or x86)"
 	@echo ""
 	@echo "============================================================================="
 
-# --- 18. Dependencies ---
 -include $(DEPS)
 
-# --- 19. Phony Targets Declaration ---
 .PHONY: all dirs install install-sysroot install-system package run debug clean distclean help

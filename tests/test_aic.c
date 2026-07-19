@@ -1,5 +1,5 @@
-#define USING_STD_H_OK
-#include <std.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 int main(int argc, char **argv) {
     void *p = malloc(128);

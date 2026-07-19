@@ -3,11 +3,6 @@
 
 #include <bits/syscall.h>
 
-/* * 1. Architecture-Specific Alias Mapping
- * Modern architectures (AArch64) removed legacy syscalls like fork, 
- * open, and wait4 in favor of clone, openat, and wait4.
- */
-
 // --- Process Management ---
 #if defined(__aarch64__)
     #define SYS_fork   __NR_clone
@@ -100,17 +95,7 @@
 #define SYS_fsync        __NR_fsync
 #define SYS_fdatasync    __NR_fdatasync
 
-/* Bios-Nim Extensions */
-#if defined(__x86_64_efi__)
-	#define SYS_uptime       __NR_uptime
-	#define SYS_clearScreen  __NR_clear
-	#define SYS_spawn        __NR_spawn
-#endif
-
-/* * 2. Architecture-Specific Assembly Triggers
- */
-
-#if defined(__x86_64__) || defined(__x86_64_efi__)
+#if defined(__x86_64__)
     /**
      * x86_64 ABI:
      * rax: syscall number
@@ -173,8 +158,6 @@
     }
 #endif
 
-/* * 3. Variadic Macro Wrappers 
- */
 #define __syscall0(n)               __syscall_gen((long)n, 0, 0, 0, 0, 0, 0)
 #define __syscall1(n, a)            __syscall_gen((long)n, (long)a, 0, 0, 0, 0, 0)
 #define __syscall2(n, a, b)         __syscall_gen((long)n, (long)a, (long)b, 0, 0, 0, 0)

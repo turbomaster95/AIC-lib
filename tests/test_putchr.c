@@ -1,5 +1,4 @@
-#define USING_STD_H_OK
-#include <std.h>
+#include <stdio.h>
 
 int main(int argc, char **argv) {
     printf("Testing Buffered Output...\n");
@@ -9,5 +8,5 @@ int main(int argc, char **argv) {
         if (i % 50 == 49) putchar('\n');
     }
     
-    exit(0); 
+    return 0;
 }

@@ -2,14 +2,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#ifdef __x86_64_efi__
-/* Example syscall-based stub. Adjust SYS_uptime and __syscall0
-   to match your environment's syscall wrapper/header. */
-#include <internal/syscall.h>
-unsigned long uptime(void) {
-    return (unsigned long)__syscall0(SYS_uptime);
-}
-#else
 /* Read /proc/uptime and return integer seconds, 0 on error */
 unsigned long uptime(void) {
     int fd = open("/proc/uptime", O_RDONLY | FD_CLOEXEC);
@@ -36,4 +28,3 @@ unsigned long uptime(void) {
     }
     return secs;
 }
-#endif

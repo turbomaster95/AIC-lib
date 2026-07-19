@@ -1,5 +1,5 @@
-#define USING_STD_H_OK
-#include <std.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int main(int argc, char **argv) {
     printf("AIC Memory Stress Test\n");
