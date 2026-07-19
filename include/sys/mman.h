@@ -1,6 +1,8 @@
 #ifndef	_SYS_MMAN_H
 #define	_SYS_MMAN_H
 
+#include <bits/types.h>
+
 #define __NEED_mode_t
 #define __NEED_size_t
 #define __NEED_off_t

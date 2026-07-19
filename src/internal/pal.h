@@ -30,6 +30,11 @@ int pal_dup3(int oldfd, int newfd, int flags);
 // Memory Operations
 void *pal_mem_allocate(size_t size);
 int   pal_mem_free(void *addr, size_t size);
+uintptr_t pal_brk(uintptr_t addr);
+void     *pal_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int       pal_munmap(void *addr, size_t length);
+int       pal_mprotect(void *addr, size_t length, int prot);
+int       pal_madvise(void *addr, size_t length, int advice);
 
 // Process Control
 void pal_exit(int status) __attribute__((__noreturn__));

@@ -20,8 +20,13 @@
 #define a_clz_32(x) __builtin_clz(x)
 #define a_ctz_32(x) __builtin_ctz(x)
 
+static inline void a_crash(void) {
+    __builtin_trap();
+}
+
 #define LOCK(x)   ((void)0)
 #define UNLOCK(x) ((void)0)
+#define get_random_secret() ((uintptr_t)0xDECAFBADDEADBEEF)
 
 // use macros to appropriately namespace these.
 #define size_classes __malloc_size_classes
@@ -51,27 +56,29 @@
 #define mremap __mremap
 #define mprotect __mprotect
 
+static const int __malloc_replaced = 0;
+static const int __aligned_alloc_replaced = 0;
+
 #define DISABLE_ALIGNED_ALLOC (__malloc_replaced && !__aligned_alloc_replaced)
 
-static inline uint64_t get_random_secret()
-{
-	uint64_t secret = (uintptr_t)&secret * 1103515245;
-	for (size_t i=0; libc.auxv[i]; i+=2)
-		if (libc.auxv[i]==AT_RANDOM)
-			memcpy(&secret, (char *)libc.auxv[i+1]+8, sizeof secret);
-	return secret;
+static inline void init_secret(uintptr_t *secret) {
+    *secret = get_random_secret();
 }
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 
 #ifndef PAGESIZE
 #define PAGESIZE PAGE_SIZE
 #endif
 
-#define MT (libc.need_locks)
+#define MT 0
 
 #define RDLOCK_IS_EXCLUSIVE 1
 
 __attribute__((__visibility__("hidden")))
-extern int __malloc_lock[1];
+int __malloc_lock[1];
 
 #define LOCK_OBJ_DEF \
 void __malloc_atfork(int who) { malloc_atfork(who); } \
@@ -103,5 +110,17 @@ static inline void malloc_atfork(int who)
 	else if (who>0) resetlock();
 	else unlock();
 }
+
+void *__libc_malloc_impl(size_t);
+void *__libc_realloc_impl(void *, size_t);
+void __libc_free_impl(void *);
+int __madvise(void *addr, size_t length, int advice);
+int __munmap(void *addr, size_t length);
+int __mprotect(void *addr, size_t length, int prot);
+void *__mmap(void *addr, size_t length, int prot, int flags, int fd, long long offset);
+
+#ifndef MADV_FREE
+#define MADV_FREE 8
+#endif
 
 #endif

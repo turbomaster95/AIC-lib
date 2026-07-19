@@ -92,3 +92,25 @@ long pal_setgid(gid_t gid) { return __syscall1(SYS_setgid, gid); }
 long pal_setreuid(uid_t ruid, uid_t euid) { return __syscall2(SYS_setreuid, ruid, euid); }
 long pal_setregid(gid_t rgid, gid_t egid) { return __syscall2(SYS_setregid, rgid, egid); }
 
+uintptr_t pal_brk(uintptr_t addr) {
+    return (uintptr_t)__syscall1(SYS_brk, (long)addr);
+}
+
+void *pal_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+    long ret = __syscall6(SYS_mmap, (long)addr, length, prot, flags, fd, offset);
+    if (ret < 0 && ret >= -4095) return (void *)0;
+    return (void *)ret;
+}
+
+int pal_munmap(void *addr, size_t length) {
+    return (int)__syscall2(SYS_munmap, (long)addr, length);
+}
+
+int pal_mprotect(void *addr, size_t length, int prot) {
+    return (int)__syscall3(SYS_mprotect, (long)addr, length, prot);
+}
+
+int pal_madvise(void *addr, size_t length, int advice) {
+    return (int)__syscall3(SYS_madvise, (long)addr, length, advice);
+}
+
