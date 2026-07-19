@@ -42,8 +42,6 @@
 #define FP_FAST_FMAL 1
 #endif
 
-int __fpclassify(double);
-int __fpclassifyf(float);
 int __fpclassifyl(long double);
 
 static __inline unsigned __FLOAT_BITS(float __f)
@@ -59,10 +57,7 @@ static __inline unsigned long long __DOUBLE_BITS(double __f)
 	return __u.__i;
 }
 
-#define fpclassify(x) ( \
-	sizeof(x) == sizeof(float) ? __fpclassifyf(x) : \
-	sizeof(x) == sizeof(double) ? __fpclassify(x) : \
-	__fpclassifyl(x) )
+int __signbitl(int);
 
 #define isinf(x) ( \
 	sizeof(x) == sizeof(float) ? (__FLOAT_BITS(x) & 0x7fffffff) == 0x7f800000 : \
@@ -83,10 +78,6 @@ static __inline unsigned long long __DOUBLE_BITS(double __f)
 	sizeof(x) == sizeof(float) ? (__FLOAT_BITS(x) & 0x7fffffff) < 0x7f800000 : \
 	sizeof(x) == sizeof(double) ? (__DOUBLE_BITS(x) & -1ULL>>1) < 0x7ffULL<<52 : \
 	__fpclassifyl(x) > FP_INFINITE)
-
-int __signbit(double);
-int __signbitf(float);
-int __signbitl(long double);
 
 #define signbit(x) ( \
 	sizeof(x) == sizeof(float) ? (int)(__FLOAT_BITS(x)>>31) : \

@@ -1,0 +1,24 @@
+#include "libm.h"
+
+static const float toint = 1.0f / FLT_EPSILON;
+
+float ceilf(float x) {
+    union fpunion u = { .f = x };
+    int e = u.u32 >> 23 & 0xff;
+    float_t y;
+
+    if (e >= 0x7f + 23 || x == 0)
+        return x;
+    if (u.u32 >> 31)
+        y = x - toint + toint - x;
+    else
+        y = x + toint - toint - x;
+    if (e <= 0x7f - 1) {
+        FORCE_EVAL(y);
+        return u.u32 >> 31 ? -0.0f : 1.0f;
+    }
+    if (y < 0)
+        return x + y + 1.0f;
+    return x + y;
+}
+

@@ -53,21 +53,28 @@ LIB_SHARED  = $(LIB_DIR)/libaic.so
 LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
-SRCS        = $(shell find src -name "*.c" ! -path "*/pals/*/*")
+LIBM_A      = $(LIB_DIR)/libm.a
+LIBM_SO      = $(LIB_DIR)/libm.so
+
+RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/pals/*/*")
+LIBM_SRCS   = $(filter src/math/%, $(RAW_SRCS))
+SRCS        = $(filter-out src/math/%, $(RAW_SRCS))
+
 ARCH_SRCS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) -name "*.c" 2>/dev/null)
 ARCH_SRCS  += src/pals/$(PLATF)/pal.c
 ARCH_ASMS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
-ALL_SRCS    = $(SRCS) $(ARCH_SRCS)
+ALL_SRCS    = $(SRCS) $(LIBM_SRCS) $(ARCH_SRCS)
 STARTUP     = src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
 TEST_SRCS   = $(wildcard tests/*.c)
 
 OBJS        = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
+LIBM_OBJS   = $(LIBM_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_OBJS   = $(ARCH_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_ASM_OBJS = $(ARCH_ASMS:src/%.S=$(OBJ_DIR)/%.o)
 ALL_OBJS    = $(OBJS) $(ARCH_OBJS) $(ARCH_ASM_OBJS)
 STARTUP_OBJ = $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/crt1.o
 TEST_BINS   = $(TEST_SRCS:tests/%.c=bin/%)
-DEPS        = $(ALL_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
+DEPS        = $(ALL_OBJS:.o=.d) $(LIBM_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
 
 ifeq ($(ARCH),x86_64)
     # This tells GCC to act as a cross-compiler for x86_64
@@ -93,7 +100,7 @@ ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(LIBM_A) $(LIBM_SO) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
 .PHONY: dirs
@@ -101,13 +108,24 @@ dirs:
 	@mkdir -p $(LIB_DIR) $(OBJ_DIR) $(SYSROOT_DIR)/include $(SYSROOT_DIR)/lib $(SYSROOT_DIR)/usr/include $(SYSROOT_DIR)/usr/lib
 
 $(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)
+	@mkdir -p $(dir $@)
 	@echo "[AR] $@"
 	@$(AR) rcs $@ $(ALL_OBJS)
 
 $(LIB_SHARED): $(ALL_OBJS) $(STARTUP_OBJ)
+	@mkdir -p $(dir $@)
 	@echo "[LD] $@ (shared)"
-	@echo $(CC) -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
 	@$(CC) -nostdlib -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
+
+$(LIBM_A): $(LIBM_OBJS)
+	@mkdir -p $(dir $@)
+	@echo "[AR] $@"
+	@$(AR) rcs $@ $(LIBM_OBJS)
+
+$(LIBM_SO): $(LIBM_OBJS)
+	@mkdir -p $(dir $@)
+	@echo "[LD] $@ (shared)"
+	@$(CC) -nostdlib -shared $(ARCFLAGS) -o $@ $(LIBM_OBJS)
 
 $(LIBC_A): $(LIB_STATIC)
 	@echo "[CP] $@"
