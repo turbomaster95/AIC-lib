@@ -37,8 +37,8 @@ else
     ARCFLAGS += -m64
 endif
 
-CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
-CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra
+CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w -isystem $(shell $(CC) -print-resource-dir)/include
+CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra -isystem $(shell $(CC) -print-resource-dir)/include
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
 
 # Output paths
@@ -53,8 +53,9 @@ LIB_SHARED  = $(LIB_DIR)/libaic.so
 LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
-SRCS        = $(shell find src -name "*.c" ! -path "*/arch/*/*")
+SRCS        = $(shell find src -name "*.c" ! -path "*/pals/*/*")
 ARCH_SRCS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) -name "*.c" 2>/dev/null)
+ARCH_SRCS  += src/pals/$(PLATF)/pal.c
 ARCH_ASMS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
 ALL_SRCS    = $(SRCS) $(ARCH_SRCS)
 STARTUP     = src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
@@ -64,7 +65,7 @@ OBJS        = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_OBJS   = $(ARCH_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_ASM_OBJS = $(ARCH_ASMS:src/%.S=$(OBJ_DIR)/%.o)
 ALL_OBJS    = $(OBJS) $(ARCH_OBJS) $(ARCH_ASM_OBJS)
-STARTUP_OBJ = $(OBJ_DIR)/arch/$(ARCH)/crt1.o
+STARTUP_OBJ = $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/crt1.o
 TEST_BINS   = $(TEST_SRCS:tests/%.c=bin/%)
 DEPS        = $(ALL_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
 
