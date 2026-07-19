@@ -13,7 +13,6 @@ FILE *stdin  = &_stdin;
 FILE *stdout = &_stdout;
 FILE *stderr = &_stderr;
 
-/* Error state for each stream (simplified - just one global for now) */
 static int _ferror = 0;
 static int _feof = 0;
 

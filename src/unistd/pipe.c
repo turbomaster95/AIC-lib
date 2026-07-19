@@ -1,5 +1,5 @@
 #include <unistd.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <errno.h>
 
 int pipe(int pipefd[2]) {
@@ -8,7 +8,7 @@ int pipe(int pipefd[2]) {
         return -1;
     }
     
-    long ret = __syscall2(SYS_pipe, (long)pipefd, 0);
+    long ret = pal_pipe(pipefd);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -24,7 +24,7 @@ int pipe2(int pipefd[2], int flags) {
         return -1;
     }
     
-    long ret = __syscall2(SYS_pipe2, (long)pipefd, (long)flags);
+    long ret = pal_pipe2(pipefd, (long)flags);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -35,7 +35,7 @@ int pipe2(int pipefd[2], int flags) {
 }
 
 int dup(int oldfd) {
-    long ret = __syscall1(SYS_dup, (long)oldfd);
+    long ret = pal_dup((long)oldfd);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -46,7 +46,7 @@ int dup(int oldfd) {
 }
 
 int dup2(int oldfd, int newfd) {
-    long ret = __syscall2(SYS_dup2, (long)oldfd, (long)newfd);
+    long ret = pal_dup2((long)oldfd, (long)newfd);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -57,7 +57,7 @@ int dup2(int oldfd, int newfd) {
 }
 
 int dup3(int oldfd, int newfd, int flags) {
-    long ret = __syscall3(SYS_dup3, (long)oldfd, (long)newfd, (long)flags);
+    long ret = pal_dup3((long)oldfd, (long)newfd, (long)flags);
     
     if (ret < 0) {
         errno = (int)(-ret);

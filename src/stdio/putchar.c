@@ -1,4 +1,4 @@
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -9,7 +9,7 @@ static int buf_idx = 0;
 
 void flush(void) {
     if (buf_idx > 0) {
-        long ret = __syscall3(SYS_write, STDOUT_FILENO, (long)stdout_buf, (long)buf_idx);
+        long ret = pal_write(STDOUT_FILENO, (void*)stdout_buf, (long)buf_idx);
         if (ret < 0) {
             /* Error handling could set errno here */
         }
@@ -26,11 +26,11 @@ int putc(int c, FILE *stream) {
 }
 
 int fputc(int c, FILE *stream) {
-    int fd = (stream != NULL) ? stream->fd : STDOUT_FILENO;    
+    int fd = (stream != NULL) ? stream->fd : STDOUT_FILENO;
     /* stderr is unbuffered */
     if (fd == STDERR_FILENO) {
         char ch = (char)c;
-        long ret = __syscall3(SYS_write, fd, (long)&ch, 1);
+        long ret = pal_write(fd, (void*)&ch, 1);
         if (ret < 0) {
             return EOF;
         }
@@ -61,7 +61,7 @@ int fputs(const char *s, FILE *stream) {
     
     if (len == 0) return 0;
     
-    long ret = __syscall3(SYS_write, fd, (long)s, (long)len);
+    long ret = pal_write(fd, (void*)s, (long)len);
     if (ret < 0) {
         return EOF;
     }

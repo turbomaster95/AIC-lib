@@ -1,9 +1,9 @@
-#include <internal/syscall.h>
 #include <unistd.h>
 #include <errno.h>
+#include <internal/pal.h>
 
 ssize_t read(int fd, void *buf, size_t count) {
-    long ret = __syscall3(SYS_read, (long)fd, (long)buf, (long)count);
+    long ret = pal_read(fd, buf, count);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
@@ -12,7 +12,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
-    long ret = __syscall3(SYS_write, (long)fd, (long)buf, (long)count);
+    long ret = pal_write(fd, buf, count);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
@@ -21,7 +21,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
 }
 
 int close(int fd) {
-    long ret = __syscall1(SYS_close, (long)fd);
+    long ret = pal_close(fd);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
@@ -30,7 +30,7 @@ int close(int fd) {
 }
 
 off_t lseek(int fd, off_t offset, int whence) {
-    long ret = __syscall3(SYS_lseek, (long)fd, (long)offset, (long)whence);
+    long ret = pal_lseek(fd, offset, whence);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
@@ -39,9 +39,10 @@ off_t lseek(int fd, off_t offset, int whence) {
 }
 
 pid_t getpid(void) {
-    return (pid_t)__syscall0(SYS_getpid);
+    return (pid_t)pal_getpid();
 }
 
 pid_t getppid(void) {
-    return (pid_t)__syscall0(SYS_getppid);
+    return (pid_t)pal_getppid();
 }
+

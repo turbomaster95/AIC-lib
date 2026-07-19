@@ -1,6 +1,6 @@
 #include <unistd.h>
-#include <internal/syscall.h>
 #include <errno.h>
+#include <internal/pal.h>
 
 long sysconf(int name) {
     switch (name) {
@@ -11,14 +11,14 @@ long sysconf(int name) {
         case _SC_CLK_TCK:
             return 100;
         case _SC_OPEN_MAX:
-            return 1024;
+            return pal_get_open_max();
         case _SC_NGROUPS_MAX:
             return 65536;
         case _SC_PAGESIZE:
-            return 4096;
+            return pal_get_pagesize();
         case _SC_NPROCESSORS_CONF:
         case _SC_NPROCESSORS_ONLN:
-            return 1;  /* Simplified - would need CPU detection */
+            return pal_get_nprocessors();
         default:
             errno = EINVAL;
             return -1;
@@ -26,61 +26,54 @@ long sysconf(int name) {
 }
 
 uid_t getuid(void) {
-    return (uid_t)__syscall0(SYS_getuid);
+    return (uid_t)pal_getuid();
 }
 
 uid_t geteuid(void) {
-    return (uid_t)__syscall0(SYS_geteuid);
+    return (uid_t)pal_geteuid();
 }
 
 gid_t getgid(void) {
-    return (gid_t)__syscall0(SYS_getgid);
+    return (gid_t)pal_getgid();
 }
 
 gid_t getegid(void) {
-    return (gid_t)__syscall0(SYS_getegid);
+    return (gid_t)pal_getegid();
 }
 
 int setuid(uid_t uid) {
-    long ret = __syscall1(SYS_setuid, (long)uid);
-
+    long ret = pal_setuid(uid);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
     }
-
     return 0;
 }
 
 int setgid(gid_t gid) {
-    long ret = __syscall1(SYS_setgid, (long)gid);
-
+    long ret = pal_setgid(gid);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
     }
-
     return 0;
 }
 
 int setreuid(uid_t ruid, uid_t euid) {
-    long ret = __syscall2(SYS_setreuid, (long)ruid, (long)euid);
-
+    long ret = pal_setreuid(ruid, euid);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
     }
-
     return 0;
 }
 
 int setregid(gid_t rgid, gid_t egid) {
-    long ret = __syscall2(SYS_setregid, (long)rgid, (long)egid);
-
+    long ret = pal_setregid(rgid, egid);
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;
     }
-
     return 0;
 }
+

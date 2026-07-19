@@ -2,10 +2,11 @@
 # AIC (Ain't it C) Standard Library - Makefile
 # =============================================================================
 # A freestanding C standard library implementation for Linux
-# Supports: x86_64, aarch64
+# Supports: x86_64, aarch64, i386/x86
 # =============================================================================
 
 ARCH   ?= $(shell uname -m)
+PLATF  ?= linux
 CC      = clang
 HOSTCC  = gcc
 AR      = ar
@@ -27,7 +28,7 @@ endif
 AIC_ROOT    = $(shell pwd)
 PREFIX      ?= /usr/local
 SYSROOT     ?= $(AIC_ROOT)/sysroot
-INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/arch/$(ARCH)
+INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/pals/$(PLATF)/arch/$(ARCH) -I$(AIC_ROOT)/src/pals/$(PLATF)/include
 
 # Build flags
 ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
@@ -53,10 +54,10 @@ LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
 SRCS        = $(shell find src -name "*.c" ! -path "*/arch/*/*")
-ARCH_SRCS   = $(shell find -L src/arch/$(ARCH) -name "*.c" 2>/dev/null)
-ARCH_ASMS   = $(shell find -L src/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
+ARCH_SRCS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) -name "*.c" 2>/dev/null)
+ARCH_ASMS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
 ALL_SRCS    = $(SRCS) $(ARCH_SRCS)
-STARTUP     = src/arch/$(ARCH)/crt1.s
+STARTUP     = src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
 TEST_SRCS   = $(wildcard tests/*.c)
 
 OBJS        = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
@@ -120,24 +121,24 @@ $(OBJ_DIR)/%.o: src/%.c
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.c
+$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/arch/$(ARCH)/crt1.o: src/arch/$(ARCH)/crt1.s
+$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/crt1.o: src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
 	@echo $(CC) $(ASFLAGS) -c $< -o $@
 	@$(CC) $(ASFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.S
+$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.S
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
 	@echo $(CC) $(ASFLAGS) -c $< -o $@
 	@$(CC) $(ASFLAGS)  -c $< -o $@
 
-$(OBJ_DIR)/arch/$(ARCH)/%.o: src/arch/$(ARCH)/%.s
+$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
 	@echo $(CC) $(ASFLAGS)  -c $< -o $@
@@ -202,13 +203,13 @@ install-system: all
 .PHONY: package
 package: all install-sysroot
 	@echo "[PACKAGE] Creating AIC distribution package..."
-	@mkdir -p $(BUILD_DIR)/package/aic-$(ARCH)
-	@cp -r $(SYSROOT_DIR)/* $(BUILD_DIR)/package/aic-$(ARCH)/
-	@cp scripts/aic-cc $(BUILD_DIR)/package/aic-$(ARCH)/bin/ 2>/dev/null || true
-	@echo "[TAR] Creating aic-$(ARCH).tar.gz..."
-	@cd $(BUILD_DIR)/package && tar -czf ../aic-$(ARCH).tar.gz aic-$(ARCH)
+	@mkdir -p $(BUILD_DIR)/package/aic-$(ARCH)-$(PLATF)
+	@cp -r $(SYSROOT_DIR)/* $(BUILD_DIR)/package/aic-$(ARCH)-$(PLATF)/
+	@cp scripts/aic-cc $(BUILD_DIR)/package/aic-$(ARCH)-$(PLATF)/bin/ 2>/dev/null || true
+	@echo "[TAR] Creating aic-$(ARCH)-$(PLATF).tar.gz..."
+	@cd $(BUILD_DIR)/package && tar -czf ../aic-$(ARCH)-$(PLATF).tar.gz aic-$(ARCH)-$(PLATF)
 	@rm -rf $(BUILD_DIR)/package
-	@echo "[AIC] Package created: $(BUILD_DIR)/aic-$(ARCH).tar.gz"
+	@echo "[AIC] Package created: $(BUILD_DIR)/aic-$(ARCH)-$(PLATF).tar.gz"
 
 T ?= test_hello
 
@@ -260,6 +261,7 @@ help:
 	@echo ""
 	@echo "  Options:"
 	@echo "    ARCH=<arch>   Target architecture (auto-detected)"
+	@echo "    PLATF=<platform> Target platform to build for (default linux)"
 	@echo "    PREFIX=<path> Installation prefix for install-system"
 	@echo "    SYSROOT=<dir> Sysroot directory for install"
 	@echo "    T=<name>      Test name for 'make run' (default: test_hello)"
@@ -287,9 +289,10 @@ help:
 	@echo "    build/lib/libc.a     - Alias (libc-compatible)"
 	@echo "    build/lib/libc.so    - Alias (libc-compatible)"
 	@echo "    sysroot/             - Complete sysroot with headers & libs"
-	@echo "    build/aic-<arch>.tar.gz - Distributable package"
+	@echo "    build/aic-<arch>-<platform>.tar.gz - Distributable package"
 	@echo ""
 	@echo "  Available architectures: aarch64, x86_64, i386 (or x86)"
+	@echo "  Available platforms: linux"
 	@echo ""
 	@echo "============================================================================="
 
