@@ -1,5 +1,6 @@
 #include <internal/pal.h>
 #include <internal/syscall.h>
+#include <sys/mman.h>
 
 #define AT_FDCWD           -100
 
@@ -114,3 +115,6 @@ int pal_madvise(void *addr, size_t length, int advice) {
     return (int)__syscall3(SYS_madvise, (long)addr, length, advice);
 }
 
+void *pal_mremap(void *old_addr, size_t old_size, size_t new_size, int flags, void *new_addr) {
+    return (void *)__syscall5(SYS_mremap, (long)old_addr, (long)old_size, (long)new_size, (long)flags, (long)new_addr);
+}

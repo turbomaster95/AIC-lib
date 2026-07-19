@@ -54,6 +54,9 @@
 #define SYS_mmap         __NR_mmap
 #define SYS_munmap       __NR_munmap
 #define SYS_brk          __NR_brk
+#define SYS_mremap	 __NR_mremap
+#define SYS_mprotect     __NR_mprotect
+#define SYS_madvise	 __NR_madvise
 #define SYS_exit         __NR_exit
 #define SYS_execve       __NR_execve
 #define SYS_wait4        __NR_wait4

@@ -8,4 +8,7 @@ void free(void *ptr);
 void exit(int code);
 char *itoa(long val, char *buf, int base);
 
+#define __libc_free free
+#define __libc_malloc_impl malloc
+
 #endif

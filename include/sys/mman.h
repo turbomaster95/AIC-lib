@@ -112,33 +112,36 @@
 
 #include <bits/mman.h>
 
-void *mmap (void *, size_t, int, int, int, off_t);
-int munmap (void *, size_t);
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int munmap(void *addr, size_t length);
+int mprotect(void *addr, size_t length, int prot);
+int msync(void *addr, size_t length, int flags);
+int madvise(void *addr, size_t length, int advice);
 
-int mprotect (void *, size_t, int);
-int msync (void *, size_t, int);
+#define __mmap mmap
+#define __munmap munmap
+#define __madvise madvise
+#define __mprotect mprotect
+#define posix_madvise madvise
 
-int posix_madvise (void *, size_t, int);
-
-int mlock (const void *, size_t);
-int munlock (const void *, size_t);
-int mlockall (int);
-int munlockall (void);
+int mlock(const void *addr, size_t length);
+int munlock(const void *addr, size_t length);
+int mlockall(int flags);
+int munlockall(void);
 
 #ifdef _GNU_SOURCE
-void *mremap (void *, size_t, size_t, int, ...);
-int remap_file_pages (void *, size_t, int, size_t, int);
-int memfd_create (const char *, unsigned);
-int mlock2 (const void *, size_t, unsigned);
+
+void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...);
+#define __mremap mremap
+
+int remap_file_pages(void *addr, size_t size, int prot, size_t pgoff, int flags);
+int memfd_create(const char *name, unsigned int flags);
+int mlock2(const void *addr, size_t length, unsigned int flags);
+
 #endif
 
-#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
-int madvise (void *, size_t, int);
-int mincore (void *, size_t, unsigned char *);
-#endif
-
-int shm_open (const char *, int, mode_t);
-int shm_unlink (const char *);
+int shm_open(const char *name, int oflag, mode_t mode);
+int shm_unlink(const char *name);
 
 #if defined(_LARGEFILE64_SOURCE)
 #define mmap64 mmap
@@ -146,4 +149,3 @@ int shm_unlink (const char *);
 #endif
 
 #endif
-

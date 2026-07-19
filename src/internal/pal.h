@@ -2,6 +2,7 @@
 #define _AIC_PAL_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <bits/types.h>
 
 // Sysconf

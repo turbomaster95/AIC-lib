@@ -4,11 +4,10 @@
 #include <stdint.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <elf.h>
 #include <string.h>
-//#include "libc.h"
-//#include "lock.h"
-//#include "dynlink.h"
+#include <internal/syscall.h>
 
 #define a_cas(p, t, s) __sync_val_compare_and_swap(p, t, s)
 
@@ -48,7 +47,7 @@ static inline void a_crash(void) {
 #define assert(x) do { if (!(x)) a_crash(); } while(0)
 #endif
 
-#define brk(p) ((uintptr_t)__syscall(SYS_brk, p))
+#define brk(p) ((uintptr_t)__syscall1(SYS_brk, p))
 
 #define mmap __mmap
 #define munmap __munmap
@@ -78,11 +77,10 @@ static inline void init_secret(uintptr_t *secret) {
 #define RDLOCK_IS_EXCLUSIVE 1
 
 __attribute__((__visibility__("hidden")))
-int __malloc_lock[1];
+static int __malloc_lock[1];
 
 #define LOCK_OBJ_DEF \
 void __malloc_atfork(int who) { malloc_atfork(who); } \
-int __malloc_lock[1]
 
 static inline void rdlock()
 {
@@ -114,10 +112,6 @@ static inline void malloc_atfork(int who)
 void *__libc_malloc_impl(size_t);
 void *__libc_realloc_impl(void *, size_t);
 void __libc_free_impl(void *);
-int __madvise(void *addr, size_t length, int advice);
-int __munmap(void *addr, size_t length);
-int __mprotect(void *addr, size_t length, int prot);
-void *__mmap(void *addr, size_t length, int prot, int flags, int fd, long long offset);
 
 #ifndef MADV_FREE
 #define MADV_FREE 8
