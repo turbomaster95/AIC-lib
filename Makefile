@@ -62,6 +62,7 @@ ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
 # Output paths
 BUILD_DIR   = build
 LIB_DIR     = $(BUILD_DIR)/lib
+LIBT	    = $(LIB_DIR)/.made
 OBJ_DIR     = $(BUILD_DIR)/objs
 SYSROOT_DIR = $(SYSROOT)
 
@@ -137,7 +138,7 @@ ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LDSO) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LIBT) $(LDSO) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
 .PHONY: dirs
@@ -174,28 +175,33 @@ $(LIBC_SO): $(LIB_SHARED)
 
 $(CRT1_OBJ): $(CRT_SRC_DIR)/crt1.c
 	@mkdir -p $(dir $@)
-	@echo "[CRT-CC] $<"
+	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -fno-PIC -c $< -o $@
 
 $(SCRT1_OBJ): $(CRT_SRC_DIR)/Scrt1.c
 	@mkdir -p $(dir $@)
-	@echo "[CRT-CC] $<"
+	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -fPIE -c $< -o $@
 
 $(RCRT1_OBJ): $(CRT_SRC_DIR)/rcrt1.c
 	@mkdir -p $(dir $@)
-	@echo "[CRT-CC] $<"
+	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -fPIE -DSTATIC_PIE -c $< -o $@
 
 $(CRTI_OBJ): $(wildcard $(CRT_ARCH_DIR)/crti.S $(CRT_ARCH_DIR)/crti.s)
 	@mkdir -p $(dir $@)
-	@echo "[CRT-AS] $<"
+	@echo "[AS] $<"
 	@$(CC) $(ASFLAGS) -c $< -o $@
 
 $(CRTN_OBJ): $(wildcard $(CRT_ARCH_DIR)/crtn.S $(CRT_ARCH_DIR)/crtn.s)
 	@mkdir -p $(dir $@)
-	@echo "[CRT-AS] $<"
+	@echo "[AS] $<"
 	@$(CC) $(ASFLAGS) -c $< -o $@
+
+$(LIBT): $(RCRT1_OBJ) $(SCRT1_OBJ) $(CRT1_OBJ) $(CRTI_OBJ) $(CRTN_OBJ)
+	@echo "[CP] $^"
+	@cp $^ $(LIB_DIR)/
+	@touch $@
 
 $(OBJ_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
@@ -230,11 +236,6 @@ bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC) $(LIBM_A)
 $(LDSO): $(LDSO_SRC)
 	@mkdir -p $(dir $@)
 	@echo "[CCLD] $@"
-	@echo $(CC) -fPIC -O2 -nostdlib -e _start -shared $(CFLAGS) \
-		-fno-plt -fno-stack-protector -mno-red-zone \
-		-fvisibility=hidden -Wl,-Bsymbolic \
-		$(INCLUDES) \
-		$^ -o $@
 	@$(CC) -fPIC -O2 -nostdlib -e _start -shared $(CFLAGS) \
 		-fno-plt -fno-stack-protector -mno-red-zone \
 		-fvisibility=hidden -Wl,-Bsymbolic \
