@@ -3,10 +3,26 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "dynl.h"
 
-#define LD_VERSION "0.0.2"
+#define LD_VERSION  "0.1.0"
+
+static Module g_modules[MAX_MODULES];
+static int g_num_modules = 0;
+static MainTargetInfo g_target_info;
+static uintptr_t g_ld_base = 0;
 
 static int streq(const char *a, const char *b) {
+    if (a == b) return 1;
+    if (!a || !b) return 0;
+    while (*a && (*a == *b)) {
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
+static int streq_icase(const char *a, const char *b) {
     if (a == b) return 1;
     if (!a || !b) return 0;
 
@@ -14,19 +30,38 @@ static int streq(const char *a, const char *b) {
         char ca = (*a >= 'A' && *a <= 'Z') ? (*a + 32) : *a;
         char cb = (*b >= 'A' && *b <= 'Z') ? (*b + 32) : *b;
 
-        if (ca != cb) {
-            return 0;
-        }
+        if (ca != cb) return 0;
         a++;
         b++;
     }
-
     return *b == '\0';
 }
 
-static int print(const char *text) {
-    pal_write(1, text, strlen(text));
-    return 0;
+static size_t get_symcount_from_gnu_hash(const uint32_t *gnu_hash) {
+    uint32_t nbuckets = gnu_hash[0];
+    uint32_t symndx = gnu_hash[1];
+    uint32_t maskwords = gnu_hash[2];
+
+    const uint64_t *bloom = (const uint64_t *)&gnu_hash[4];
+    const uint32_t *buckets = (const uint32_t *)&bloom[maskwords];
+    const uint32_t *chains = &buckets[nbuckets];
+
+    uint32_t max_sym = 0;
+    for (uint32_t i = 0; i < nbuckets; i++) {
+        if (buckets[i] > max_sym) {
+            max_sym = buckets[i];
+        }
+    }
+
+    if (max_sym < symndx) return symndx;
+
+    const uint32_t *chain = &chains[max_sym - symndx];
+    while (1) {
+        max_sym++;
+        if (*chain & 1) break;
+        chain++;
+    }
+    return max_sym;
 }
 
 static void print_help(void) {
@@ -34,16 +69,14 @@ static void print_help(void) {
         "Usage: ld.so [OPTION]... EXECUTABLE-FILE [ARGS...]\n"
         "Dynamic ELF loader and linker for AIC.\n\n"
         "Options:\n"
-        "  --help     Display this help message and exit\n"
-        "  -v         Output version information\n\n";
+        "  --help, -h     Display this help message and exit\n"
+        "  --version, -v  Output version information\n\n";
     pal_write(1, msg, strlen(msg));
 }
 
 static void print_version(void) {
-    const char *version_str = "aic-ld " LD_VERSION "\n";
-    size_t len = sizeof("aic-ld " LD_VERSION "\n") - 1; 
-    
-    pal_write(1, version_str, len);
+    static const char *msg = "aic-ld " LD_VERSION "\n";
+    pal_write(1, msg, strlen(msg));
 }
 
 void self_relocate(uintptr_t *sp) {
@@ -70,19 +103,15 @@ void self_relocate(uintptr_t *sp) {
     Elf64_Phdr *ph = 0;
 
     if (at_base) {
-        // ld.so was loaded as an interpreter for another program.
-        // at_base is ld.so's load bias. Parse our own ELF header.
         load_bias = at_base;
         Elf64_Ehdr *ehdr = (Elf64_Ehdr *)at_base;
         ph = (Elf64_Phdr *)(at_base + ehdr->e_phoff);
         phent = ehdr->e_phentsize;
         phnum = ehdr->e_phnum;
     } else {
-        // ld.so was executed directly.
         if (!at_phdr || !phent || !phnum) return;
         ph = (Elf64_Phdr *)at_phdr;
 
-        // try to find PT_PHDR
         int found_bias = 0;
         for (int i = 0; i < phnum; i++) {
             Elf64_Phdr *p = (Elf64_Phdr *)((uintptr_t)ph + (i * phent));
@@ -101,7 +130,6 @@ void self_relocate(uintptr_t *sp) {
                         Elf64_Ehdr *ehdr = (Elf64_Ehdr *)(at_phdr - 0x40);
                         load_bias = (at_phdr - ehdr->e_phoff) - p->p_vaddr;
                     } else {
-                        // Standard ELF header size offset (0x40)
                         load_bias = (at_phdr - 0x40) - p->p_vaddr;
                     }
                     break;
@@ -109,6 +137,8 @@ void self_relocate(uintptr_t *sp) {
             }
         }
     }
+
+    g_ld_base = load_bias;
 
     Elf64_Dyn *dyn = 0;
     for (int i = 0; i < phnum; i++) {
@@ -144,6 +174,241 @@ void self_relocate(uintptr_t *sp) {
     }
 }
 
+static int open_so_file(const char *name) {
+    if (name[0] == '/' || (name[0] == '.' && name[1] == '/')) {
+        return pal_open(name, 0, 0);
+    }
+
+    static const char *search_paths[] = {
+        "/lib/x86_64-linux-gnu/",
+        "/usr/lib/x86_64-linux-gnu/",
+        "/lib64/",
+        "/usr/lib64/",
+        "/lib/",
+        "/usr/lib/",
+        "./",
+        NULL
+    };
+
+    char fullpath[512];
+    for (int i = 0; search_paths[i]; i++) {
+        size_t plen = strlen(search_paths[i]);
+        size_t nlen = strlen(name);
+        if (plen + nlen >= sizeof(fullpath)) continue;
+
+        memmove(fullpath, search_paths[i], plen);
+        memmove(fullpath + plen, name, nlen + 1);
+
+        int fd = pal_open(fullpath, 0, 0);
+        if (fd >= 0) return fd;
+    }
+    return -1;
+}
+
+static uintptr_t load_module(const char *filename, int is_main) {
+    for (int i = 0; i < g_num_modules; i++) {
+        if (streq(g_modules[i].name, filename)) {
+            return g_modules[i].base;
+        }
+    }
+
+    if (g_num_modules >= MAX_MODULES) return 0;
+
+    int fd = open_so_file(filename);
+    if (fd < 0) return 0;
+
+    Elf64_Ehdr ehdr;
+    if (pal_read(fd, &ehdr, sizeof(ehdr)) != sizeof(ehdr)) {
+        pal_close(fd);
+        return 0;
+    }
+
+    if (ehdr.e_ident[0] != 0x7f || ehdr.e_ident[1] != 'E' ||
+        ehdr.e_ident[2] != 'L'  || ehdr.e_ident[3] != 'F') {
+        pal_close(fd);
+        return 0;
+    }
+
+    Elf64_Phdr phdr[32];
+    pal_lseek(fd, ehdr.e_phoff, 0);
+    pal_read(fd, phdr, ehdr.e_phentsize * ehdr.e_phnum);
+
+    uintptr_t min_vaddr = (uintptr_t)-1;
+    uintptr_t max_vaddr = 0;
+
+    for (int i = 0; i < ehdr.e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD) {
+            if (phdr[i].p_vaddr < min_vaddr) min_vaddr = phdr[i].p_vaddr;
+            if (phdr[i].p_vaddr + phdr[i].p_memsz > max_vaddr) {
+                max_vaddr = phdr[i].p_vaddr + phdr[i].p_memsz;
+            }
+        }
+    }
+
+    uintptr_t page_min = min_vaddr & ~0xFFFU;
+    uintptr_t page_max = (max_vaddr + 0xFFFU) & ~0xFFFU;
+    size_t total_size = page_max - page_min;
+
+    void *map_addr = NULL;
+    uintptr_t base = 0;
+
+    if (ehdr.e_type == ET_DYN) {
+        map_addr = pal_mmap(0, total_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if ((intptr_t)map_addr < 0 || !map_addr) {
+            pal_close(fd);
+            return 0;
+        }
+        base = (uintptr_t)map_addr - page_min;
+    } else {
+        base = 0;
+        map_addr = pal_mmap((void *)page_min, total_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    }
+
+    Module *mod = &g_modules[g_num_modules++];
+    memset(mod, 0, sizeof(Module));
+    
+    size_t fn_len = strlen(filename);
+    if (fn_len >= sizeof(mod->name)) fn_len = sizeof(mod->name) - 1;
+    memmove(mod->name, filename, fn_len);
+    mod->name[fn_len] = '\0';
+    mod->base = base;
+
+    uintptr_t phdr_addr = 0;
+    for (int i = 0; i < ehdr.e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD) {
+            uintptr_t seg_dst = base + phdr[i].p_vaddr;
+            pal_lseek(fd, phdr[i].p_offset, 0);
+            pal_read(fd, (void *)seg_dst, phdr[i].p_filesz);
+            if (phdr[i].p_memsz > phdr[i].p_filesz) {
+                memset((void *)(seg_dst + phdr[i].p_filesz), 0, phdr[i].p_memsz - phdr[i].p_filesz);
+            }
+        } else if (phdr[i].p_type == PT_DYNAMIC) {
+            mod->dynamic = (Elf64_Dyn *)(base + phdr[i].p_vaddr);
+        } else if (phdr[i].p_type == PT_PHDR) {
+            phdr_addr = base + phdr[i].p_vaddr;
+        }
+    }
+    pal_close(fd);
+
+    if (is_main) {
+        g_target_info.entry = base + ehdr.e_entry;
+        g_target_info.phent = ehdr.e_phentsize;
+        g_target_info.phnum = ehdr.e_phnum;
+        g_target_info.base = base;
+        g_target_info.phdr = phdr_addr ? phdr_addr : (base + ehdr.e_phoff);
+    }
+
+    if (mod->dynamic) {
+        for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
+            switch (d->d_tag) {
+                case DT_STRTAB:   mod->strtab = (const char *)(base + d->d_un.d_ptr); break;
+                case DT_SYMTAB:   mod->symtab = (Elf64_Sym *)(base + d->d_un.d_ptr); break;
+                case DT_RELA:     mod->rela = (Elf64_Rela *)(base + d->d_un.d_ptr); break;
+                case DT_RELASZ:   mod->relasz = d->d_un.d_val; break;
+                case DT_RELAENT:  mod->relaent = d->d_un.d_val; break;
+                case DT_JMPREL:   mod->jmprel = (Elf64_Rela *)(base + d->d_un.d_ptr); break;
+                case DT_PLTRELSZ: mod->pltrelsz = d->d_un.d_val; break;
+                case DT_HASH:     mod->hash = (uint32_t *)(base + d->d_un.d_ptr); break;
+                case DT_GNU_HASH: mod->gnu_hash = (uint32_t *)(base + d->d_un.d_ptr); break;
+            }
+        }
+
+        if (mod->hash) {
+            mod->nsyms = mod->hash[1];
+        } else if (mod->gnu_hash) {
+            mod->nsyms = get_symcount_from_gnu_hash(mod->gnu_hash);
+        }
+
+        if (mod->strtab) {
+            for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
+                if (d->d_tag == DT_NEEDED) {
+                    const char *so_name = mod->strtab + d->d_un.d_val;
+                    load_module(so_name, 0);
+                }
+            }
+        }
+    }
+
+    return base + ehdr.e_entry;
+}
+
+static uintptr_t lookup_symbol_except(const char *sym_name, Module *skip_mod, size_t *out_size) {
+    for (int m = 0; m < g_num_modules; m++) {
+        Module *mod = &g_modules[m];
+        if (mod == skip_mod || !mod->symtab || !mod->strtab) continue;
+
+        for (size_t i = 1; i < mod->nsyms; i++) {
+            Elf64_Sym *sym = &mod->symtab[i];
+            if (sym->st_shndx == SHN_UNDEF) continue;
+
+            const char *name = mod->strtab + sym->st_name;
+            if (streq(name, sym_name)) {
+                if (out_size) *out_size = sym->st_size;
+                return mod->base + sym->st_value;
+            }
+        }
+    }
+    return 0;
+}
+
+static uintptr_t lookup_symbol(const char *sym_name) {
+    return lookup_symbol_except(sym_name, NULL, NULL);
+}
+
+static void relocate_all(void) {
+    for (int m = 0; m < g_num_modules; m++) {
+        Module *mod = &g_modules[m];
+
+        if (mod->rela && mod->relaent) {
+            Elf64_Xword count = mod->relasz / mod->relaent;
+            for (Elf64_Xword i = 0; i < count; i++) {
+                Elf64_Rela *r = &mod->rela[i];
+                uint32_t type = ELF64_R_TYPE(r->r_info);
+                uint32_t sym_idx = ELF64_R_SYM(r->r_info);
+                Elf64_Addr *patch = (Elf64_Addr *)(mod->base + r->r_offset);
+
+                if (type == R_X86_64_RELATIVE) {
+                    *patch = mod->base + r->r_addend;
+                } else if (type == R_X86_64_GLOB_DAT || type == R_X86_64_64) {
+                    if (sym_idx != 0) {
+                        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+                        uintptr_t val = lookup_symbol(sym_name);
+                        if (val) *patch = val + r->r_addend;
+                    }
+                } else if (type == R_X86_64_COPY) {
+                    if (sym_idx != 0) {
+                        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+                        size_t src_size = 0;
+                        uintptr_t src_addr = lookup_symbol_except(sym_name, mod, &src_size);
+                        if (src_addr) {
+                            size_t copy_size = src_size ? src_size : mod->symtab[sym_idx].st_size;
+                            memmove(patch, (void *)src_addr, copy_size);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (mod->jmprel) {
+            Elf64_Xword count = mod->pltrelsz / sizeof(Elf64_Rela);
+            for (Elf64_Xword i = 0; i < count; i++) {
+                Elf64_Rela *r = &mod->jmprel[i];
+                uint32_t type = ELF64_R_TYPE(r->r_info);
+                uint32_t sym_idx = ELF64_R_SYM(r->r_info);
+                Elf64_Addr *patch = (Elf64_Addr *)(mod->base + r->r_offset);
+
+                if (type == R_X86_64_JUMP_SLOT || type == R_X86_64_GLOB_DAT) {
+                    if (sym_idx != 0) {
+                        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+                        uintptr_t val = lookup_symbol(sym_name);
+                        if (val) *patch = val;
+                    }
+                }
+            }
+        }
+    }
+}
+
 __attribute__((visibility("hidden")))
 void _start_c(uintptr_t *sp) {
     self_relocate(sp);
@@ -152,22 +417,66 @@ void _start_c(uintptr_t *sp) {
     char **argv = (char **)&sp[1];
 
     if (argc < 2) {
-        print("ld.so: missing target executable\nTry '--help' for usage.\n");
+        pal_write(2, "ld.so: missing target executable\nTry '--help' for usage.\n", 57);
         pal_exit(1);
     }
 
     const char *arg1 = argv[1];
-    if (streq(arg1, "--help") || streq(arg1, "-h")) {
+    if (streq_icase(arg1, "--help") || streq_icase(arg1, "-h")) {
         print_help();
         pal_exit(0);
-    } else if (streq(arg1, "-v")) {
+    } else if (streq_icase(arg1, "-v") || streq_icase(arg1, "--version")) {
         print_version();
         pal_exit(0);
-    } else {
-        
     }
 
-    pal_exit(0);
+    uintptr_t entry_point = load_module(arg1, 1);
+    if (!entry_point) {
+        pal_write(2, "ld.so: failed to load target executable or shared libraries\n", 60);
+        pal_exit(1);
+    }
+
+    relocate_all();
+
+    char **envp = &argv[argc + 1];
+    while (*envp) envp++;
+    Elf64_auxv_t *auxv = (Elf64_auxv_t *)(envp + 1);
+
+    for (Elf64_auxv_t *a = auxv; a->a_type != AT_NULL; a++) {
+        switch (a->a_type) {
+            case AT_PHDR:   a->a_un.a_val = g_target_info.phdr; break;
+            case AT_PHENT:  a->a_un.a_val = g_target_info.phent; break;
+            case AT_PHNUM:  a->a_un.a_val = g_target_info.phnum; break;
+            case AT_ENTRY:  a->a_un.a_val = g_target_info.entry; break;
+            case AT_BASE:   a->a_un.a_val = g_ld_base; break;
+            case AT_EXECFN: a->a_un.a_val = (uintptr_t)argv[1]; break;
+        }
+    }
+
+    Elf64_auxv_t *auxv_end = auxv;
+    while (auxv_end->a_type != AT_NULL) auxv_end++;
+    auxv_end++;
+
+    uintptr_t *stack_end = (uintptr_t *)auxv_end;
+    size_t total_words = stack_end - &sp[2];
+
+    sp[0] = (uintptr_t)(argc - 1);
+    memmove(&sp[1], &sp[2], total_words * sizeof(uintptr_t));
+
+    __asm__ __volatile__(
+        "mov %0, %%rsp\n\t"
+        "xor %%rax, %%rax\n\t"
+        "xor %%rbx, %%rbx\n\t"
+        "xor %%rcx, %%rcx\n\t"
+        "xor %%rdx, %%rdx\n\t"
+        "xor %%rsi, %%rsi\n\t"
+        "xor %%rdi, %%rdi\n\t"
+        "xor %%rbp, %%rbp\n\t"
+        "jmp *%1\n\t"
+        :
+        : "r"(sp), "r"(entry_point)
+        : "memory"
+    );
 }
 
 __asm__(
