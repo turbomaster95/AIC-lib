@@ -513,6 +513,9 @@ static uintptr_t init_main_from_kernel_auxv(Elf64_auxv_t *auxv, const char *exec
     if (mod->dynamic) {
         for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
             switch (d->d_tag) {
+		case DT_INIT:          mod->init_func = d->d_un.d_ptr; break;
+		case DT_INIT_ARRAY:    mod->init_array = d->d_un.d_ptr; break;
+		case DT_INIT_ARRAYSZ:  mod->init_array_sz = d->d_un.d_val; break;
                 case DT_STRTAB:   mod->strtab = (const char *)(base + d->d_un.d_ptr); break;
                 case DT_SYMTAB:   mod->symtab = (Elf64_Sym *)(base + d->d_un.d_ptr); break;
                 case DT_RELA:     mod->rela = (Elf64_Rela *)(base + d->d_un.d_ptr); break;
