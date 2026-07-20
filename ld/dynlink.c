@@ -5,7 +5,7 @@
 #include <string.h>
 #include "dynm.h"
 
-#define LD_VERSION  "0.1.0"
+#define LD_VERSION  "0.1.1"
 
 static Module g_modules[MAX_MODULES];
 static int g_num_modules = 0;
@@ -188,14 +188,13 @@ static int open_so_file(const char *name) {
 
     static const char *search_paths[] = {
         "./lib/",
-	"./",
+        "./",
         "/lib/x86_64-linux-gnu/",
         "/usr/lib/x86_64-linux-gnu/",
         "/lib64/",
         "/usr/lib64/",
         "/lib/",
         "/usr/lib/",
-        "./",
         NULL
     };
 
@@ -205,8 +204,8 @@ static int open_so_file(const char *name) {
         size_t nlen = internal_strlen(name);
         if (plen + nlen >= sizeof(fullpath)) continue;
 
-        memmove(fullpath, search_paths[i], plen);
-        memmove(fullpath + plen, name, nlen + 1);
+        internal_memmove(fullpath, search_paths[i], plen);
+        internal_memmove(fullpath + plen, name, nlen + 1);
 
         int fd = pal_open(fullpath, 0, 0);
         if (fd >= 0) return fd;
@@ -274,11 +273,11 @@ static uintptr_t load_module(const char *filename, int is_main) {
     }
 
     Module *mod = &g_modules[g_num_modules++];
-    memset(mod, 0, sizeof(Module));
+    internal_memset(mod, 0, sizeof(Module));
 
     size_t fn_len = internal_strlen(filename);
     if (fn_len >= sizeof(mod->name)) fn_len = sizeof(mod->name) - 1;
-    memmove(mod->name, filename, fn_len);
+    internal_memmove(mod->name, filename, fn_len);
     mod->name[fn_len] = '\0';
     mod->base = base;
 
@@ -289,7 +288,7 @@ static uintptr_t load_module(const char *filename, int is_main) {
             pal_lseek(fd, phdr[i].p_offset, 0);
             pal_read(fd, (void *)seg_dst, phdr[i].p_filesz);
             if (phdr[i].p_memsz > phdr[i].p_filesz) {
-                memset((void *)(seg_dst + phdr[i].p_filesz), 0, phdr[i].p_memsz - phdr[i].p_filesz);
+                internal_memset((void *)(seg_dst + phdr[i].p_filesz), 0, phdr[i].p_memsz - phdr[i].p_filesz);
             }
         } else if (phdr[i].p_type == PT_DYNAMIC) {
             mod->dynamic = (Elf64_Dyn *)(base + phdr[i].p_vaddr);
@@ -332,7 +331,12 @@ static uintptr_t load_module(const char *filename, int is_main) {
             for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
                 if (d->d_tag == DT_NEEDED) {
                     const char *so_name = mod->strtab + d->d_un.d_val;
-                    load_module(so_name, 0);
+                    if (!load_module(so_name, 0)) {
+                        pal_write(2, "ld.so: error: failed to load shared library: ", 45);
+                        pal_write(2, so_name, internal_strlen(so_name));
+                        pal_write(2, "\n", 1);
+                        pal_exit(1);
+                    }
                 }
             }
         }
@@ -411,7 +415,7 @@ static void relocate_all(void) {
                             uintptr_t src_addr = lookup_symbol_except(sym_name, mod, &src_size);
                             if (src_addr) {
                                 size_t copy_size = src_size ? src_size : mod->symtab[sym_idx].st_size;
-                                memmove(patch, (void *)src_addr, copy_size);
+                                internal_memmove(patch, (void *)src_addr, copy_size);
                             }
                         }
                         break;
@@ -480,11 +484,11 @@ static uintptr_t init_main_from_kernel_auxv(Elf64_auxv_t *auxv, const char *exec
     }
 
     Module *mod = &g_modules[g_num_modules++];
-    memset(mod, 0, sizeof(Module));
+    internal_memset(mod, 0, sizeof(Module));
 
     size_t fn_len = internal_strlen(exec_name);
     if (fn_len >= sizeof(mod->name)) fn_len = sizeof(mod->name) - 1;
-    memmove(mod->name, exec_name, fn_len);
+    internal_memmove(mod->name, exec_name, fn_len);
     mod->name[fn_len] = '\0';
     mod->base = base;
     mod->dynamic = dyn;
@@ -520,12 +524,12 @@ static uintptr_t init_main_from_kernel_auxv(Elf64_auxv_t *auxv, const char *exec
             for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
                 if (d->d_tag == DT_NEEDED) {
                     const char *so_name = mod->strtab + d->d_un.d_val;
-		    if (!load_module(so_name, 0)) {
-		        pal_write(2, "ld.so: error: failed to load shared library: ", 45);
-		        pal_write(2, so_name, internal_strlen(so_name));
-		        pal_write(2, "\n", 1);
-		        pal_exit(1);
-		    }
+                    if (!load_module(so_name, 0)) {
+                        pal_write(2, "ld.so: error: failed to load shared library: ", 45);
+                        pal_write(2, so_name, internal_strlen(so_name));
+                        pal_write(2, "\n", 1);
+                        pal_exit(1);
+                    }
                 }
             }
         }
@@ -606,24 +610,24 @@ void _start_c(uintptr_t *sp) {
         size_t total_words = stack_end - &sp[2];
 
         sp[0] = (uintptr_t)(argc - 1);
-        memmove(&sp[1], &sp[2], total_words * sizeof(uintptr_t));
+        internal_memmove(&sp[1], &sp[2], total_words * sizeof(uintptr_t));
     }
 
     __asm__ __volatile__(
-	    "mov %[sp], %%rsp\n\t"
-	    "mov %[entry], %%r12\n\t"
-	    "xor %%rax, %%rax\n\t"
-	    "xor %%rbx, %%rbx\n\t"
-	    "xor %%rcx, %%rcx\n\t"
-	    "xor %%rdx, %%rdx\n\t"
-	    "xor %%rsi, %%rsi\n\t"
-	    "xor %%rdi, %%rdi\n\t"
-	    "xor %%rbp, %%rbp\n\t"
-	    "jmp *%%r12\n\t"
-	    :
-	    : [sp] "r"(sp), [entry] "r"(entry_point)
-	    : "r12", "memory"
-     );
+        "mov %[sp], %%rsp\n\t"
+        "mov %[entry], %%r12\n\t"
+        "xor %%rax, %%rax\n\t"
+        "xor %%rbx, %%rbx\n\t"
+        "xor %%rcx, %%rcx\n\t"
+        "xor %%rdx, %%rdx\n\t"
+        "xor %%rsi, %%rsi\n\t"
+        "xor %%rdi, %%rdi\n\t"
+        "xor %%rbp, %%rbp\n\t"
+        "jmp *%%r12\n\t"
+        :
+        : [sp] "r"(sp), [entry] "r"(entry_point)
+        : "r12", "memory"
+    );
 }
 
 __asm__(

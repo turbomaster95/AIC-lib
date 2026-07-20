@@ -71,7 +71,7 @@ LIBM_A      = $(LIB_DIR)/libm.a
 LIBM_SO     = $(LIB_DIR)/libm.so
 
 LDSO        = $(LIB_DIR)/ld.so
-LDSO_SRC    = ld/dynlink.c src/platforms/$(PLATF)/pal.c
+LDSO_SRC    = ld/std.c ld/dynlink.c src/platforms/$(PLATF)/pal.c
 
 RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/platforms/*/*")
 LIBM_SRCS   = $(filter src/math/%, $(RAW_SRCS))

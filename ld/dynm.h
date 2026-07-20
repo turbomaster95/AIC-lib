@@ -49,4 +49,7 @@ typedef struct MainTargetInfo {
     uintptr_t base;
 } MainTargetInfo;
 
+void *internal_memset(void *s, int c, size_t n);
+void *internal_memmove(void *dest, const void *src, size_t n);
+
 #endif
