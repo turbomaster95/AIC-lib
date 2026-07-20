@@ -3,19 +3,9 @@
 
 #include <elf.h>
 #include <stddef.h>
+#include <sys/mman.h>
 
 #define MAX_MODULES 32
-
-#ifndef PROT_READ
-#define PROT_READ  0x1
-#define PROT_WRITE 0x2
-#define PROT_EXEC  0x4
-#endif
-
-#ifndef MAP_PRIVATE
-#define MAP_PRIVATE   0x02
-#define MAP_ANONYMOUS 0x20
-#endif
 
 #ifndef DT_GNU_HASH
 #define DT_GNU_HASH 0x6ffffef5

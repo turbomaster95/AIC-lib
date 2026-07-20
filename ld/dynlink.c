@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 #include "dynm.h"
 
 #define LD_VERSION  "0.1.1"
@@ -269,7 +270,11 @@ static uintptr_t load_module(const char *filename, int is_main) {
         base = (uintptr_t)map_addr - page_min;
     } else {
         base = 0;
-        map_addr = pal_mmap((void *)page_min, total_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        map_addr = pal_mmap((void *)page_min, total_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+	if (map_addr == (void *)-1 || map_addr != (void *)page_min) {
+	    pal_close(fd);
+	    return 0;
+	}
     }
 
     Module *mod = &g_modules[g_num_modules++];
@@ -349,6 +354,10 @@ static uintptr_t load_module(const char *filename, int is_main) {
 }
 
 static uintptr_t lookup_symbol_except(const char *sym_name, Module *skip_mod, size_t *out_size) {
+    uintptr_t weak_val = 0;
+    size_t weak_size = 0;
+    int found_weak = 0;
+
     for (int m = 0; m < g_num_modules; m++) {
         Module *mod = &g_modules[m];
         if (mod == skip_mod || !mod->symtab || !mod->strtab) continue;
@@ -357,13 +366,28 @@ static uintptr_t lookup_symbol_except(const char *sym_name, Module *skip_mod, si
             Elf64_Sym *sym = &mod->symtab[i];
             if (sym->st_shndx == SHN_UNDEF) continue;
 
+            unsigned char bind = ELF64_ST_BIND(sym->st_info);
+            if (bind == STB_LOCAL) continue;
+
             const char *name = mod->strtab + sym->st_name;
             if (streq(name, sym_name)) {
-                if (out_size) *out_size = sym->st_size;
-                return mod->base + sym->st_value;
+                if (bind == STB_GLOBAL || bind == STB_GNU_UNIQUE) {
+                    if (out_size) *out_size = sym->st_size;
+                    return mod->base + sym->st_value;
+                } else if (bind == STB_WEAK && !found_weak) {
+                    weak_val = mod->base + sym->st_value;
+                    weak_size = sym->st_size;
+                    found_weak = 1;
+                }
             }
         }
     }
+
+    if (found_weak) {
+        if (out_size) *out_size = weak_size;
+        return weak_val;
+    }
+
     return 0;
 }
 
@@ -382,41 +406,83 @@ static void relocate_all(void) {
                 uint32_t type = ELF64_R_TYPE(r->r_info);
                 uint32_t sym_idx = ELF64_R_SYM(r->r_info);
                 Elf64_Addr *patch = (Elf64_Addr *)(mod->base + r->r_offset);
+		Elf64_Sym *sym = (sym_idx != 0 && mod->symtab) ? &mod->symtab[sym_idx] : NULL;
+                unsigned char bind = sym ? ELF64_ST_BIND(sym->st_info) : STB_LOCAL;
 
                 switch (type) {
                     case R_X86_64_RELATIVE:
                         *patch = mod->base + r->r_addend;
                         break;
 
-                    case R_X86_64_JUMP_SLOT:
-                    case R_X86_64_GLOB_DAT:
-                        if (sym_idx != 0) {
-                            const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
-                            uintptr_t val = lookup_symbol(sym_name);
-                            if (!val) {
-                                pal_write(2, "ld.so: undefined symbol: ", 25);
-                                pal_write(2, sym_name, internal_strlen(sym_name));
-                                pal_write(2, "\n", 1);
-                                pal_exit(1);
-                            }
-                            *patch = val + r->r_addend;
+		    case R_X86_64_JUMP_SLOT:
+		        if (sym_idx != 0) {
+			        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+			        uintptr_t val = lookup_symbol(sym_name);
+			        if (val) {
+			            *patch = val;
+			        } else {
+		        	    Elf64_Sym *sym = (mod->symtab && sym_idx < mod->nsyms) ? &mod->symtab[sym_idx] : NULL;
+			            unsigned char bind = sym ? ELF64_ST_BIND(sym->st_info) : STB_LOCAL;
+			            if (bind != STB_WEAK) {
+			                pal_write(2, "ld.so: undefined symbol: ", 25);
+		        	        pal_write(2, sym_name, internal_strlen(sym_name));
+			                pal_write(2, "\n", 1);
+			                pal_exit(1);
+			            }
+			        }
                         }
-                        break;
+		    break;
+
+		    case R_X86_64_GLOB_DAT:
+		        if (sym_idx != 0) {
+			        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+			        uintptr_t val = lookup_symbol(sym_name);
+			        if (val) {
+			            *patch = val + r->r_addend;
+			        } else {
+			            Elf64_Sym *sym = (mod->symtab && sym_idx < mod->nsyms) ? &mod->symtab[sym_idx] : NULL;
+			            unsigned char bind = sym ? ELF64_ST_BIND(sym->st_info) : STB_LOCAL;
+			            if (bind == STB_WEAK) {
+			                *patch = 0; /* Weak GOT data pointer safely resolves to NULL */
+			            } else {
+			                pal_write(2, "ld.so: undefined symbol: ", 25);
+			                pal_write(2, sym_name, internal_strlen(sym_name));
+			                pal_write(2, "\n", 1);
+			                pal_exit(1);
+			            }
+			        }
+			}
+		        break;
 
                     case R_X86_64_64:
-                        if (sym_idx != 0) {
-                            const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
-                            uintptr_t val = lookup_symbol(sym_name);
-                            if (val) *patch = val + r->r_addend;
-                        }
+			if (sym_idx != 0) {
+			        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+			        uintptr_t val = lookup_symbol(sym_name);
+			        if (val) {
+			            *patch = val + r->r_addend;
+			        } else {
+			            Elf64_Sym *sym = (mod->symtab && sym_idx < mod->nsyms) ? &mod->symtab[sym_idx] : NULL;
+			            unsigned char bind = sym ? ELF64_ST_BIND(sym->st_info) : STB_LOCAL;
+			            if (bind == STB_WEAK) {
+			                *patch = 0 + r->r_addend; /* Resolves _ITM_deregisterTMCloneTable to 0 */
+			            } else {
+			                pal_write(2, "ld.so: undefined symbol: ", 25);
+			                pal_write(2, sym_name, internal_strlen(sym_name));
+			                pal_write(2, "\n", 1);
+			                pal_exit(1);
+			            }
+			        }
+		        } else {
+			        *patch = mod->base + r->r_addend;
+	                }
                         break;
 
          	    case R_X86_64_IRELATIVE:
 		        uintptr_t *reloc_addr = (uintptr_t *)(mod->base + r->r_offset);
 		        uintptr_t resolver_addr = mod->base + r->r_addend;
-		        typedef uintptr_t (*ifunc_resolver_t)(void);
+			typedef uintptr_t (*ifunc_resolver_t)(uint64_t hwcap, const void *cpu_features);
 		        ifunc_resolver_t resolver = (ifunc_resolver_t)resolver_addr;
-		        *reloc_addr = resolver();
+		        *reloc_addr = resolver(0, NULL);
 		        break;
 
                     case R_X86_64_COPY:

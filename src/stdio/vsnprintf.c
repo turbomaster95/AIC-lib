@@ -56,6 +56,89 @@ typedef enum {
     LENGTH_LDBL,    /* long double */
 } length_modifier_t;
 
+__attribute__((weak)) int __fpclassifyl(long double x) {
+    union {
+        long double ld;
+        struct {
+            unsigned long long mantissa;
+            unsigned short exp_sign;
+            unsigned short pad[3];
+        } x87;
+        struct {
+            unsigned long long mantissa;
+            unsigned short exp_sign;
+        } d64;
+    } u;
+    u.ld = x;
+
+    if (sizeof(long double) == 12 || sizeof(long double) == 16) {
+        unsigned short exp = u.x87.exp_sign & 0x7FFF;
+        unsigned long long mant = u.x87.mantissa;
+
+        if (exp == 0) {
+            return (mant == 0) ? FP_ZERO : FP_SUBNORMAL;
+        }
+        if (exp == 0x7FFF) {
+            return (mant == 0x8000000000000000ULL) ? FP_INFINITE : FP_NAN;
+        }
+        return FP_NORMAL;
+    } else {
+        unsigned short exp = u.d64.exp_sign & 0x7FF;
+        unsigned long long mant = u.d64.mantissa & 0x000FFFFFFFFFFFFFULL;
+
+        if (exp == 0) {
+            return (mant == 0) ? FP_ZERO : FP_SUBNORMAL;
+        }
+        if (exp == 0x7FF) {
+            return (mant == 0) ? FP_INFINITE : FP_NAN;
+        }
+        return FP_NORMAL;
+    }
+}
+
+__attribute__((weak)) int __signbitl(long double x) {
+    union {
+        long double ld;
+        unsigned char bytes[sizeof(long double)];
+    } u;
+    u.ld = x;
+
+    if (sizeof(long double) == 12 || sizeof(long double) == 16) {
+        return (u.bytes[9] & 0x80) != 0;
+    } else {
+        return (u.bytes[sizeof(long double) - 1] & 0x80) != 0;
+    }
+}
+
+__attribute__((weak)) long double modfl(long double x, long double *iptr) {
+    int cls = __fpclassifyl(x);
+
+    if (cls == FP_NAN) {
+        *iptr = x;
+        return x;
+    }
+    if (cls == FP_INFINITE) {
+        *iptr = x;
+        return __signbitl(x) ? -0.0L : 0.0L;
+    }
+
+    if (x >= 9223372036854775808.0L || x <= -9223372036854775808.0L) {
+        *iptr = x;
+        return __signbitl(x) ? -0.0L : 0.0L;
+    }
+
+    long long i = (long long)x;
+    long double integer_part = (long double)i;
+
+    if (i == 0 && __signbitl(x)) {
+        *iptr = -0.0L;
+    } else {
+        *iptr = integer_part;
+    }
+
+    return x - *iptr;
+}
+
 static void output_char(vsnprintf_state_t *state, char c)
 {
     state->total++;
