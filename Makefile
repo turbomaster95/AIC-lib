@@ -5,6 +5,14 @@
 # Supports: x86_64, aarch64, i386/x86
 # =============================================================================
 
+CCACHE_BIN := $(firstword $(wildcard /usr/bin/ccache /bin/ccache $(shell which ccache 2>/dev/null)))
+
+ifeq ($(CCACHE_BIN),)
+  CCACHE :=
+else
+  CCACHE := $(CCACHE_BIN)
+endif
+
 ARCH   ?= $(shell uname -m)
 PLATF  ?= linux
 CC      = clang
@@ -13,6 +21,12 @@ AR      = ar
 LD      = ld.lld
 OBJCOPY = objcopy
 IS_ANDROID = $(shell uname -o | grep -qi "android" && echo yes || echo no)
+
+ifeq ($(strip $(CCACHE)),)
+  CC  := $(CC)
+else
+  CC  := $(CCACHE) $(CC)
+endif
 
 # Define PIE flags only if needed
 ifeq ($(IS_ANDROID),yes)
@@ -37,8 +51,8 @@ else
     ARCFLAGS += -m64
 endif
 
-CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w -isystem $(shell $(CC) -print-resource-dir)/include
-CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra -isystem $(shell $(CC) -print-resource-dir)/include
+CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
+CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
 
 # Output paths
@@ -54,7 +68,10 @@ LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
 LIBM_A      = $(LIB_DIR)/libm.a
-LIBM_SO      = $(LIB_DIR)/libm.so
+LIBM_SO     = $(LIB_DIR)/libm.so
+
+LDSO        = $(LIB_DIR)/ld.so
+LDSO_SRC    = ld/dynlink.c src/pals/$(PLATF)/pal.c
 
 RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/pals/*/*")
 LIBM_SRCS   = $(filter src/math/%, $(RAW_SRCS))
@@ -99,7 +116,7 @@ ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(LIBM_A) $(LIBM_SO) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(LDSO) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
 .PHONY: dirs
@@ -169,6 +186,20 @@ bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
 	@echo "[LD] $@"
 	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
 
+$(LDSO): $(LDSO_SRC)
+	@mkdir -p $(dir $@)
+	@echo "[CCLD] $@"
+	@echo $(CC) -fPIC -O2 -nostdlib -e _start -shared \
+		-fno-plt -fno-stack-protector -mno-red-zone \
+		-fvisibility=hidden -Wl,-Bsymbolic \
+		$(INCLUDES) \
+		$^ -o $@
+	@$(CC) -fPIC -O2 -nostdlib -e _start -shared \
+		-fno-plt -fno-stack-protector -mno-red-zone \
+		-fvisibility=hidden -Wl,-Bsymbolic \
+		$(INCLUDES) \
+		$^ -o $@
+
 .PHONY: install install-sysroot sysroot
 install: install-sysroot
 	@echo "[AIC] Installation complete to $(PREFIX)"
@@ -193,6 +224,7 @@ install-sysroot: all
 	@cp $(LIBC_SO) $(SYSROOT_DIR)/lib/
 	@cp $(LIBM_A) $(SYSROOT_DIR)/lib/
 	@cp $(LIBM_SO) $(SYSROOT_DIR)/lib/
+	@cp $(LDSO) $(SYSROOT_DIR)/lib/
 	@cp $(LIB_STATIC) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIB_SHARED) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIBC_A) $(SYSROOT_DIR)/usr/lib/
@@ -219,6 +251,7 @@ install-system: all
 	@cp $(LIB_SHARED) $(PREFIX)/lib/libc.so
 	@cp $(LIBM_A) $(PREFIX)/lib/libm.a
 	@cp $(LIBM_SO) $(PREFIX)/lib/libm.so
+	@cp $(LDSO) $(PREFIX)/lib/ld.so
 	@echo "[AIC] Installed to $(PREFIX)"
 
 .PHONY: package
