@@ -57,7 +57,7 @@ static __inline unsigned long long __DOUBLE_BITS(double __f)
 	return __u.__i;
 }
 
-int __signbitl(int);
+int __signbitl(long double);
 
 #define isinf(x) ( \
 	sizeof(x) == sizeof(float) ? (__FLOAT_BITS(x) & 0x7fffffff) == 0x7f800000 : \

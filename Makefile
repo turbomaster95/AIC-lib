@@ -5,6 +5,8 @@
 # Supports: x86_64, aarch64, i386/x86
 # =============================================================================
 
+to_dep = $(foreach f,$(1),$(dir $(f)).$(notdir $(f:.o=.d)))
+
 CCACHE_BIN := $(firstword $(wildcard /usr/bin/ccache /bin/ccache $(shell which ccache 2>/dev/null)))
 
 ifeq ($(CCACHE_BIN),)
@@ -43,6 +45,7 @@ AIC_ROOT    = $(shell pwd)
 PREFIX      ?= /usr/local
 SYSROOT     ?= $(AIC_ROOT)/sysroot
 INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/platforms/$(PLATF)/arch/$(ARCH) -I$(AIC_ROOT)/src/platforms/$(PLATF)/include
+INCLUDES   += -I$(AIC_ROOT)/src/crt/plat/$(PLATF)/arch/$(ARCH)
 
 # Build flags
 ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
@@ -51,8 +54,9 @@ else
     ARCFLAGS += -m64
 endif
 
-CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
-CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra -O0
+DEPFLAGS    = -MF $(dir $@).$(notdir $(@:.o=.d))
+CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP $(DEPFLAGS) -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
+CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP $(DEPFLAGS) -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra -O0
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
 
 # Output paths
@@ -73,15 +77,14 @@ LIBM_SO     = $(LIB_DIR)/libm.so
 LDSO        = $(LIB_DIR)/ld.so
 LDSO_SRC    = ld/std.c ld/dynlink.c src/platforms/$(PLATF)/pal.c
 
-RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/platforms/*/*")
+RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/platforms/*/*" ! -path "*/crt/*")
 LIBM_SRCS   = $(filter src/math/%, $(RAW_SRCS))
 SRCS        = $(filter-out src/math/%, $(RAW_SRCS))
 
 ARCH_SRCS   = $(shell find -L src/platforms/$(PLATF)/arch/$(ARCH) -name "*.c" 2>/dev/null)
 ARCH_SRCS  += src/platforms/$(PLATF)/pal.c
-ARCH_ASMS   = $(shell find -L src/platforms/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
+ARCH_ASMS   = $(shell find -L src/platforms/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt*.S" ! -name "crt*.s" 2>/dev/null)
 ALL_SRCS    = $(SRCS) $(LIBM_SRCS) $(ARCH_SRCS)
-STARTUP     = src/platforms/$(PLATF)/arch/$(ARCH)/crt1.s
 TEST_SRCS   = $(wildcard tests/*.c)
 
 OBJS        = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
@@ -89,9 +92,20 @@ LIBM_OBJS   = $(LIBM_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_OBJS   = $(ARCH_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_ASM_OBJS = $(ARCH_ASMS:src/%.S=$(OBJ_DIR)/%.o)
 ALL_OBJS    = $(OBJS) $(ARCH_OBJS) $(ARCH_ASM_OBJS)
-STARTUP_OBJ = $(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/crt1.o
 TEST_BINS   = $(TEST_SRCS:tests/%.c=bin/%)
-DEPS        = $(ALL_OBJS:.o=.d) $(LIBM_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
+CRT_SRC_DIR  = src/crt
+CRT_ARCH_DIR = src/crt/plat/$(PLATF)/arch/$(ARCH)
+
+CRT1_OBJ    = $(OBJ_DIR)/crt/crt1.o
+SCRT1_OBJ   = $(OBJ_DIR)/crt/Scrt1.o
+RCRT1_OBJ   = $(OBJ_DIR)/crt/rcrt1.o
+CRTI_OBJ    = $(OBJ_DIR)/crt/crti.o
+CRTN_OBJ    = $(OBJ_DIR)/crt/crtn.o
+
+CRT_OBJS    = $(CRT1_OBJ) $(SCRT1_OBJ) $(RCRT1_OBJ) $(CRTI_OBJ) $(CRTN_OBJ)
+
+ALL_DEP_INPUTS = $(ALL_OBJS) $(LIBM_OBJS) $(CRT_OBJS)
+DEPS           = $(call to_dep,$(ALL_DEP_INPUTS))
 
 ifeq ($(ARCH),x86_64)
     # This tells GCC to act as a cross-compiler for x86_64
@@ -110,25 +124,32 @@ ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
         PLAT_FLAGS := -target i686-linux-gnu -fPIC
     endif
 endif
+
+ifeq ($(IS_ANDROID),yes)
+  STARTUP_OBJ = $(SCRT1_OBJ)
+else
+  STARTUP_OBJ = $(CRT1_OBJ)
+endif
+
 OCFLAGS =
 CFLAGS += $(OCFLAGS) $(PLAT_FLAGS)
 ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(LDSO) $(TEST_BINS)
+all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LDSO) $(TEST_BINS)
 	@echo "[AIC] Build complete."
 
 .PHONY: dirs
 dirs:
-	@mkdir -p $(LIB_DIR) $(OBJ_DIR) $(SYSROOT_DIR)/include $(SYSROOT_DIR)/lib $(SYSROOT_DIR)/usr/include $(SYSROOT_DIR)/usr/lib
+	@mkdir -p $(LIB_DIR) $(OBJ_DIR) $(OBJ_DIR)/crt
 
-$(LIB_STATIC): $(ALL_OBJS) $(STARTUP_OBJ)
+$(LIB_STATIC): $(ALL_OBJS) $(CRT_OBJS)
 	@mkdir -p $(dir $@)
 	@echo "[AR] $@"
 	@$(AR) rcs $@ $(ALL_OBJS)
 
-$(LIB_SHARED): $(ALL_OBJS) $(STARTUP_OBJ)
+$(LIB_SHARED): $(ALL_OBJS) $(CRT_OBJS)
 	@mkdir -p $(dir $@)
 	@echo "[LD] $@ (shared)"
 	@$(CC) -nostdlib -shared $(ARCFLAGS) -o $@ $(ALL_OBJS)
@@ -151,6 +172,31 @@ $(LIBC_SO): $(LIB_SHARED)
 	@echo "[CP] $@"
 	@cp $< $@
 
+$(CRT1_OBJ): $(CRT_SRC_DIR)/crt1.c
+	@mkdir -p $(dir $@)
+	@echo "[CRT-CC] $<"
+	@$(CC) $(CFLAGS) -fno-PIC -c $< -o $@
+
+$(SCRT1_OBJ): $(CRT_SRC_DIR)/Scrt1.c
+	@mkdir -p $(dir $@)
+	@echo "[CRT-CC] $<"
+	@$(CC) $(CFLAGS) -fPIE -c $< -o $@
+
+$(RCRT1_OBJ): $(CRT_SRC_DIR)/rcrt1.c
+	@mkdir -p $(dir $@)
+	@echo "[CRT-CC] $<"
+	@$(CC) $(CFLAGS) -fPIE -DSTATIC_PIE -c $< -o $@
+
+$(CRTI_OBJ): $(wildcard $(CRT_ARCH_DIR)/crti.S $(CRT_ARCH_DIR)/crti.s)
+	@mkdir -p $(dir $@)
+	@echo "[CRT-AS] $<"
+	@$(CC) $(ASFLAGS) -c $< -o $@
+
+$(CRTN_OBJ): $(wildcard $(CRT_ARCH_DIR)/crtn.S $(CRT_ARCH_DIR)/crtn.s)
+	@mkdir -p $(dir $@)
+	@echo "[CRT-AS] $<"
+	@$(CC) $(ASFLAGS) -c $< -o $@
+
 $(OBJ_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
@@ -160,11 +206,6 @@ $(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/%.o: src/platforms/$(PLATF)/arch/$(AR
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
 	@$(CC) -fPIC $(CFLAGS) -c $< -o $@
-
-$(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/crt1.o: src/platforms/$(PLATF)/arch/$(ARCH)/crt1.s
-	@mkdir -p $(dir $@)
-	@echo "[AS] $<"
-	@$(CC) -fPIC $(ASFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/%.o: src/platforms/$(PLATF)/arch/$(ARCH)/%.S
 	@mkdir -p $(dir $@)
@@ -181,10 +222,10 @@ build/tests/%.o: tests/%.c
 	@echo "[TEST-CC] $<"
 	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
+bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC) $(LIBM_A)
 	@mkdir -p bin
 	@echo "[LD] $@"
-	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) -o $@
+	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) $(LIBM_A) -o $@
 
 $(LDSO): $(LDSO_SRC)
 	@mkdir -p $(dir $@)
@@ -232,8 +273,8 @@ install-sysroot: all
 	@cp $(LIBM_A) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIBM_SO) $(SYSROOT_DIR)/usr/lib/
 	@echo "[INSTALL] Startup files..."
-	@cp $(STARTUP_OBJ) $(SYSROOT_DIR)/lib/crt1.o
-	@cp $(STARTUP_OBJ) $(SYSROOT_DIR)/usr/lib/crt1.o
+	@cp $(CRT_OBJS) $(SYSROOT_DIR)/lib/
+	@cp $(CRT_OBJS) $(SYSROOT_DIR)/usr/lib/
 	@echo "[INSTALL] Toolchain scripts..."
 	@cp scripts/aic-gcc $(SYSROOT_DIR)/bin/
 	@cp scripts/aic.spec $(SYSROOT_DIR)/lib/

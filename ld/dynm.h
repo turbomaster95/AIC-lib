@@ -39,6 +39,9 @@ typedef struct Module {
     uint32_t *hash;
     uint32_t *gnu_hash;
     size_t nsyms;
+    uintptr_t init_func;
+    uintptr_t init_array;
+    size_t    init_array_sz;
 } Module;
 
 typedef struct MainTargetInfo {

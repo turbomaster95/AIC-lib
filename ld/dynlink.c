@@ -309,6 +309,9 @@ static uintptr_t load_module(const char *filename, int is_main) {
     if (mod->dynamic) {
         for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
             switch (d->d_tag) {
+		case DT_INIT:     mod->init_func = d->d_un.d_ptr; break;
+		case DT_INIT_ARRAY: mod->init_array = d->d_un.d_ptr; break;
+		case DT_INIT_ARRAYSZ: mod->init_array_sz = d->d_un.d_val;; break;
                 case DT_STRTAB:   mod->strtab = (const char *)(base + d->d_un.d_ptr); break;
                 case DT_SYMTAB:   mod->symtab = (Elf64_Sym *)(base + d->d_un.d_ptr); break;
                 case DT_RELA:     mod->rela = (Elf64_Rela *)(base + d->d_un.d_ptr); break;
@@ -407,6 +410,14 @@ static void relocate_all(void) {
                             if (val) *patch = val + r->r_addend;
                         }
                         break;
+
+         	    case R_X86_64_IRELATIVE:
+		        uintptr_t *reloc_addr = (uintptr_t *)(mod->base + r->r_offset);
+		        uintptr_t resolver_addr = mod->base + r->r_addend;
+		        typedef uintptr_t (*ifunc_resolver_t)(void);
+		        ifunc_resolver_t resolver = (ifunc_resolver_t)resolver_addr;
+		        *reloc_addr = resolver();
+		        break;
 
                     case R_X86_64_COPY:
                         if (sym_idx != 0) {
@@ -538,6 +549,27 @@ static uintptr_t init_main_from_kernel_auxv(Elf64_auxv_t *auxv, const char *exec
     return at_entry;
 }
 
+
+typedef void (*init_fn_t)(void);
+
+void run_module_init(Module *mod) {
+    if (mod->init_func) {
+        init_fn_t init_fn = (init_fn_t)(mod->base + mod->init_func);
+        init_fn();
+    }
+
+    if (mod->init_array && mod->init_array_sz > 0) {
+        init_fn_t *array = (init_fn_t *)(mod->base + mod->init_array);
+        size_t count = mod->init_array_sz / sizeof(init_fn_t);
+
+        for (size_t i = 0; i < count; i++) {
+            if (array[i] != NULL && (uintptr_t)array[i] != (uintptr_t)-1) {
+                array[i]();
+            }
+        }
+    }
+}
+
 __attribute__((visibility("hidden")))
 void _start_c(uintptr_t *sp) {
     self_relocate(sp);
@@ -611,6 +643,10 @@ void _start_c(uintptr_t *sp) {
 
         sp[0] = (uintptr_t)(argc - 1);
         internal_memmove(&sp[1], &sp[2], total_words * sizeof(uintptr_t));
+    }
+
+    for (int i = g_num_modules - 1; i >= 0; i--) {
+        run_module_init(&g_modules[i]);
     }
 
     __asm__ __volatile__(
