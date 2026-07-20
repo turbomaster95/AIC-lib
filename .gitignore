@@ -1,5 +1,8 @@
 build/
 *.d
+*.so
+*.a
+*.o
 bin/
 sysroot/
 third_party/tinycc

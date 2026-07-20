@@ -36,6 +36,7 @@ void     *pal_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t
 int       pal_munmap(void *addr, size_t length);
 int       pal_mprotect(void *addr, size_t length, int prot);
 int       pal_madvise(void *addr, size_t length, int advice);
+void *pal_mremap(void *old_addr, size_t old_size, size_t new_size, int flags, void *new_addr);
 
 // Process Control
 void pal_exit(int status) __attribute__((__noreturn__));

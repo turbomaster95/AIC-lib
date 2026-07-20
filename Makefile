@@ -80,7 +80,6 @@ ifeq ($(ARCH),x86_64)
     # This tells GCC to act as a cross-compiler for x86_64
     TARGET_FLAGS = -target x86_64-linux-gnu -nostdlib
 
-    # Apply it to your compilation variables
     CFLAGS   += $(TARGET_FLAGS)
     ASFLAGS  += $(TARGET_FLAGS)
     LDFLAGS  += $(TARGET_FLAGS)
@@ -138,30 +137,27 @@ $(LIBC_SO): $(LIB_SHARED)
 $(OBJ_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) -fPIC $(CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) -fPIC $(CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/crt1.o: src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@echo $(CC) $(ASFLAGS) -c $< -o $@
-	@$(CC) $(ASFLAGS) -c $< -o $@
+	@$(CC) -fPIC $(ASFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.S
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@echo $(CC) $(ASFLAGS) -c $< -o $@
-	@$(CC) $(ASFLAGS)  -c $< -o $@
+	@$(CC) -fPIC $(ASFLAGS)  -c $< -o $@
 
 $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@echo $(CC) $(ASFLAGS)  -c $< -o $@
-	@$(CC) $(ASFLAGS)  -c $< -o $@
+	@$(CC) -fPIC $(ASFLAGS)  -c $< -o $@
 
 build/tests/%.o: tests/%.c
 	@mkdir -p $(dir $@)
@@ -195,10 +191,14 @@ install-sysroot: all
 	@cp $(LIB_SHARED) $(SYSROOT_DIR)/lib/
 	@cp $(LIBC_A) $(SYSROOT_DIR)/lib/
 	@cp $(LIBC_SO) $(SYSROOT_DIR)/lib/
+	@cp $(LIBM_A) $(SYSROOT_DIR)/lib/
+	@cp $(LIBM_SO) $(SYSROOT_DIR)/lib/
 	@cp $(LIB_STATIC) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIB_SHARED) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIBC_A) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIBC_SO) $(SYSROOT_DIR)/usr/lib/
+	@cp $(LIBM_A) $(SYSROOT_DIR)/usr/lib/
+	@cp $(LIBM_SO) $(SYSROOT_DIR)/usr/lib/
 	@echo "[INSTALL] Startup files..."
 	@cp $(STARTUP_OBJ) $(SYSROOT_DIR)/lib/crt1.o
 	@cp $(STARTUP_OBJ) $(SYSROOT_DIR)/usr/lib/crt1.o
@@ -217,6 +217,8 @@ install-system: all
 	@cp $(LIB_SHARED) $(PREFIX)/lib/libaic.so
 	@cp $(LIB_STATIC) $(PREFIX)/lib/libc.a
 	@cp $(LIB_SHARED) $(PREFIX)/lib/libc.so
+	@cp $(LIBM_A) $(PREFIX)/lib/libm.a
+	@cp $(LIBM_SO) $(PREFIX)/lib/libm.so
 	@echo "[AIC] Installed to $(PREFIX)"
 
 .PHONY: package
@@ -307,6 +309,8 @@ help:
 	@echo "    build/lib/libaic.so  - Shared library"
 	@echo "    build/lib/libc.a     - Alias (libc-compatible)"
 	@echo "    build/lib/libc.so    - Alias (libc-compatible)"
+	@echo "    build/lib/libm.a     - Static math library"
+	@echo "    build/lib/libm.so    - Shared math library"
 	@echo "    sysroot/             - Complete sysroot with headers & libs"
 	@echo "    build/aic-<arch>-<platform>.tar.gz - Distributable package"
 	@echo ""
