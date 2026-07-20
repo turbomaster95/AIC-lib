@@ -7,7 +7,6 @@
 /* File descriptor type */
 typedef struct {
     int fd;
-    // You can add buffer fields here later
 } FILE;
 
 /* Standard file descriptors */
@@ -72,7 +71,7 @@ int sscanf(const char *s, const char *format, ...);
 void setbuf(FILE *stream, char *buf);
 int setvbuf(FILE *stream, char *buf, int mode, size_t size);
 
-/* AIC Internal/Helper helpers */
+/* Internal Helpers */
 void print_str(const char *s);
 void print_hex(unsigned long n);
 

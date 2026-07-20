@@ -1,14 +1,32 @@
 #include <elf.h>
 #include <internal/pal.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
+#define LD_VERSION "0.0.2"
+
 static int streq(const char *a, const char *b) {
-    while (*a && (*a == *b)) {
+    if (a == b) return 1;
+    if (!a || !b) return 0;
+
+    while (*a) {
+        char ca = (*a >= 'A' && *a <= 'Z') ? (*a + 32) : *a;
+        char cb = (*b >= 'A' && *b <= 'Z') ? (*b + 32) : *b;
+
+        if (ca != cb) {
+            return 0;
+        }
         a++;
         b++;
     }
-    return *a == *b;
+
+    return *b == '\0';
+}
+
+static int print(const char *text) {
+    pal_write(1, text, strlen(text));
+    return 0;
 }
 
 static void print_help(void) {
@@ -22,8 +40,10 @@ static void print_help(void) {
 }
 
 static void print_version(void) {
-    static const char *msg = "aic-ld 0.1.0\n";
-    pal_write(1, msg, strlen(msg));
+    const char *version_str = "aic-ld " LD_VERSION "\n";
+    size_t len = sizeof("aic-ld " LD_VERSION "\n") - 1; 
+    
+    pal_write(1, version_str, len);
 }
 
 void self_relocate(uintptr_t *sp) {
@@ -132,19 +152,19 @@ void _start_c(uintptr_t *sp) {
     char **argv = (char **)&sp[1];
 
     if (argc < 2) {
-        pal_write(2, "ld.so: missing target executable\nTry '--help' for usage.\n", 57);
+        print("ld.so: missing target executable\nTry '--help' for usage.\n");
         pal_exit(1);
     }
 
     const char *arg1 = argv[1];
-    if (streq(arg1, "--help")) {
+    if (streq(arg1, "--help") || streq(arg1, "-h")) {
         print_help();
         pal_exit(0);
-    }
-
-    if (streq(arg1, "-v")) {
+    } else if (streq(arg1, "-v")) {
         print_version();
         pal_exit(0);
+    } else {
+        
     }
 
     pal_exit(0);

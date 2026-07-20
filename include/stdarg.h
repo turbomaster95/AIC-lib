@@ -7,7 +7,6 @@ typedef __builtin_va_list va_list;
 #define va_copy __builtin_va_copy
 #define va_end __builtin_va_end
 
-/* Compatibility typedef for libio.h and other headers */
 typedef va_list __gnuc_va_list;
 #define _VA_LIST_DEFINED
 
