@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "dynl.h"
+#include "dynm.h"
 
 #define LD_VERSION  "0.1.0"
 
@@ -11,6 +11,13 @@ static Module g_modules[MAX_MODULES];
 static int g_num_modules = 0;
 static MainTargetInfo g_target_info;
 static uintptr_t g_ld_base = 0;
+
+__attribute__((visibility("hidden")))
+size_t internal_strlen(const char *s) {
+    size_t len = 0;
+    while (s[len]) len++;
+    return len;
+}
 
 static int streq(const char *a, const char *b) {
     if (a == b) return 1;
@@ -71,12 +78,12 @@ static void print_help(void) {
         "Options:\n"
         "  --help, -h     Display this help message and exit\n"
         "  --version, -v  Output version information\n\n";
-    pal_write(1, msg, strlen(msg));
+    pal_write(1, msg, internal_strlen(msg));
 }
 
 static void print_version(void) {
     static const char *msg = "aic-ld " LD_VERSION "\n";
-    pal_write(1, msg, strlen(msg));
+    pal_write(1, msg, internal_strlen(msg));
 }
 
 void self_relocate(uintptr_t *sp) {
@@ -180,6 +187,8 @@ static int open_so_file(const char *name) {
     }
 
     static const char *search_paths[] = {
+        "./lib/",
+	"./",
         "/lib/x86_64-linux-gnu/",
         "/usr/lib/x86_64-linux-gnu/",
         "/lib64/",
@@ -192,8 +201,8 @@ static int open_so_file(const char *name) {
 
     char fullpath[512];
     for (int i = 0; search_paths[i]; i++) {
-        size_t plen = strlen(search_paths[i]);
-        size_t nlen = strlen(name);
+        size_t plen = internal_strlen(search_paths[i]);
+        size_t nlen = internal_strlen(name);
         if (plen + nlen >= sizeof(fullpath)) continue;
 
         memmove(fullpath, search_paths[i], plen);
@@ -266,8 +275,8 @@ static uintptr_t load_module(const char *filename, int is_main) {
 
     Module *mod = &g_modules[g_num_modules++];
     memset(mod, 0, sizeof(Module));
-    
-    size_t fn_len = strlen(filename);
+
+    size_t fn_len = internal_strlen(filename);
     if (fn_len >= sizeof(mod->name)) fn_len = sizeof(mod->name) - 1;
     memmove(mod->name, filename, fn_len);
     mod->name[fn_len] = '\0';
@@ -367,24 +376,45 @@ static void relocate_all(void) {
                 uint32_t sym_idx = ELF64_R_SYM(r->r_info);
                 Elf64_Addr *patch = (Elf64_Addr *)(mod->base + r->r_offset);
 
-                if (type == R_X86_64_RELATIVE) {
-                    *patch = mod->base + r->r_addend;
-                } else if (type == R_X86_64_GLOB_DAT || type == R_X86_64_64) {
-                    if (sym_idx != 0) {
-                        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
-                        uintptr_t val = lookup_symbol(sym_name);
-                        if (val) *patch = val + r->r_addend;
-                    }
-                } else if (type == R_X86_64_COPY) {
-                    if (sym_idx != 0) {
-                        const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
-                        size_t src_size = 0;
-                        uintptr_t src_addr = lookup_symbol_except(sym_name, mod, &src_size);
-                        if (src_addr) {
-                            size_t copy_size = src_size ? src_size : mod->symtab[sym_idx].st_size;
-                            memmove(patch, (void *)src_addr, copy_size);
+                switch (type) {
+                    case R_X86_64_RELATIVE:
+                        *patch = mod->base + r->r_addend;
+                        break;
+
+                    case R_X86_64_JUMP_SLOT:
+                    case R_X86_64_GLOB_DAT:
+                        if (sym_idx != 0) {
+                            const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+                            uintptr_t val = lookup_symbol(sym_name);
+                            if (!val) {
+                                pal_write(2, "ld.so: undefined symbol: ", 25);
+                                pal_write(2, sym_name, internal_strlen(sym_name));
+                                pal_write(2, "\n", 1);
+                                pal_exit(1);
+                            }
+                            *patch = val + r->r_addend;
                         }
-                    }
+                        break;
+
+                    case R_X86_64_64:
+                        if (sym_idx != 0) {
+                            const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+                            uintptr_t val = lookup_symbol(sym_name);
+                            if (val) *patch = val + r->r_addend;
+                        }
+                        break;
+
+                    case R_X86_64_COPY:
+                        if (sym_idx != 0) {
+                            const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
+                            size_t src_size = 0;
+                            uintptr_t src_addr = lookup_symbol_except(sym_name, mod, &src_size);
+                            if (src_addr) {
+                                size_t copy_size = src_size ? src_size : mod->symtab[sym_idx].st_size;
+                                memmove(patch, (void *)src_addr, copy_size);
+                            }
+                        }
+                        break;
                 }
             }
         }
@@ -401,12 +431,107 @@ static void relocate_all(void) {
                     if (sym_idx != 0) {
                         const char *sym_name = mod->strtab + mod->symtab[sym_idx].st_name;
                         uintptr_t val = lookup_symbol(sym_name);
-                        if (val) *patch = val;
+                        if (!val) {
+                            pal_write(2, "ld.so: error: symbol not found: ", 32);
+                            pal_write(2, sym_name, internal_strlen(sym_name));
+                            pal_write(2, "\n", 1);
+                            pal_exit(1);
+                        }
+                        *patch = val;
                     }
                 }
             }
         }
     }
+}
+
+static uintptr_t init_main_from_kernel_auxv(Elf64_auxv_t *auxv, const char *exec_name) {
+    Elf64_Addr at_phdr = 0, at_entry = 0;
+    Elf64_Half phent = 0, phnum = 0;
+
+    for (Elf64_auxv_t *a = auxv; a->a_type != AT_NULL; a++) {
+        switch (a->a_type) {
+            case AT_PHDR:  at_phdr = a->a_un.a_val; break;
+            case AT_PHENT: phent = a->a_un.a_val; break;
+            case AT_PHNUM: phnum = a->a_un.a_val; break;
+            case AT_ENTRY: at_entry = a->a_un.a_val; break;
+        }
+    }
+
+    if (!at_phdr || !phent || !phnum || !at_entry) return 0;
+
+    uintptr_t base = 0;
+    Elf64_Dyn *dyn = NULL;
+
+    for (int i = 0; i < phnum; i++) {
+        Elf64_Phdr *p = (Elf64_Phdr *)(at_phdr + (i * phent));
+        if (p->p_type == PT_PHDR) {
+            base = at_phdr - p->p_vaddr;
+            break;
+        }
+    }
+
+    for (int i = 0; i < phnum; i++) {
+        Elf64_Phdr *p = (Elf64_Phdr *)(at_phdr + (i * phent));
+        if (p->p_type == PT_DYNAMIC) {
+            dyn = (Elf64_Dyn *)(base + p->p_vaddr);
+            break;
+        }
+    }
+
+    Module *mod = &g_modules[g_num_modules++];
+    memset(mod, 0, sizeof(Module));
+
+    size_t fn_len = internal_strlen(exec_name);
+    if (fn_len >= sizeof(mod->name)) fn_len = sizeof(mod->name) - 1;
+    memmove(mod->name, exec_name, fn_len);
+    mod->name[fn_len] = '\0';
+    mod->base = base;
+    mod->dynamic = dyn;
+
+    g_target_info.entry = at_entry;
+    g_target_info.phent = phent;
+    g_target_info.phnum = phnum;
+    g_target_info.base = base;
+    g_target_info.phdr = at_phdr;
+
+    if (mod->dynamic) {
+        for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
+            switch (d->d_tag) {
+                case DT_STRTAB:   mod->strtab = (const char *)(base + d->d_un.d_ptr); break;
+                case DT_SYMTAB:   mod->symtab = (Elf64_Sym *)(base + d->d_un.d_ptr); break;
+                case DT_RELA:     mod->rela = (Elf64_Rela *)(base + d->d_un.d_ptr); break;
+                case DT_RELASZ:   mod->relasz = d->d_un.d_val; break;
+                case DT_RELAENT:  mod->relaent = d->d_un.d_val; break;
+                case DT_JMPREL:   mod->jmprel = (Elf64_Rela *)(base + d->d_un.d_ptr); break;
+                case DT_PLTRELSZ: mod->pltrelsz = d->d_un.d_val; break;
+                case DT_HASH:     mod->hash = (uint32_t *)(base + d->d_un.d_ptr); break;
+                case DT_GNU_HASH: mod->gnu_hash = (uint32_t *)(base + d->d_un.d_ptr); break;
+            }
+        }
+
+        if (mod->hash) {
+            mod->nsyms = mod->hash[1];
+        } else if (mod->gnu_hash) {
+            mod->nsyms = get_symcount_from_gnu_hash(mod->gnu_hash);
+        }
+
+        if (mod->strtab) {
+            for (Elf64_Dyn *d = mod->dynamic; d->d_tag != DT_NULL; d++) {
+                if (d->d_tag == DT_NEEDED) {
+                    const char *so_name = mod->strtab + d->d_un.d_val;
+		    if (!load_module(so_name, 0)) {
+		        pal_write(2, "ld.so: error: failed to load shared library: ", 45);
+		        pal_write(2, so_name, internal_strlen(so_name));
+		        pal_write(2, "\n", 1);
+		        pal_exit(1);
+		    }
+                }
+            }
+        }
+    }
+
+    return at_entry;
 }
 
 __attribute__((visibility("hidden")))
@@ -416,67 +541,89 @@ void _start_c(uintptr_t *sp) {
     int argc = (int)sp[0];
     char **argv = (char **)&sp[1];
 
-    if (argc < 2) {
-        pal_write(2, "ld.so: missing target executable\nTry '--help' for usage.\n", 57);
-        pal_exit(1);
-    }
-
-    const char *arg1 = argv[1];
-    if (streq_icase(arg1, "--help") || streq_icase(arg1, "-h")) {
-        print_help();
-        pal_exit(0);
-    } else if (streq_icase(arg1, "-v") || streq_icase(arg1, "--version")) {
-        print_version();
-        pal_exit(0);
-    }
-
-    uintptr_t entry_point = load_module(arg1, 1);
-    if (!entry_point) {
-        pal_write(2, "ld.so: failed to load target executable or shared libraries\n", 60);
-        pal_exit(1);
-    }
-
-    relocate_all();
-
     char **envp = &argv[argc + 1];
     while (*envp) envp++;
     Elf64_auxv_t *auxv = (Elf64_auxv_t *)(envp + 1);
 
+    uintptr_t at_base = 0;
     for (Elf64_auxv_t *a = auxv; a->a_type != AT_NULL; a++) {
-        switch (a->a_type) {
-            case AT_PHDR:   a->a_un.a_val = g_target_info.phdr; break;
-            case AT_PHENT:  a->a_un.a_val = g_target_info.phent; break;
-            case AT_PHNUM:  a->a_un.a_val = g_target_info.phnum; break;
-            case AT_ENTRY:  a->a_un.a_val = g_target_info.entry; break;
-            case AT_BASE:   a->a_un.a_val = g_ld_base; break;
-            case AT_EXECFN: a->a_un.a_val = (uintptr_t)argv[1]; break;
+        if (a->a_type == AT_BASE) {
+            at_base = a->a_un.a_val;
+            break;
         }
     }
 
-    Elf64_auxv_t *auxv_end = auxv;
-    while (auxv_end->a_type != AT_NULL) auxv_end++;
-    auxv_end++;
+    uintptr_t entry_point = 0;
+    int is_interpreter_mode = (at_base != 0);
 
-    uintptr_t *stack_end = (uintptr_t *)auxv_end;
-    size_t total_words = stack_end - &sp[2];
+    if (is_interpreter_mode) {
+        entry_point = init_main_from_kernel_auxv(auxv, argv[0]);
+        if (!entry_point) {
+            pal_write(2, "ld.so: failed to initialize target executable\n", 46);
+            pal_exit(1);
+        }
+    } else {
+        if (argc < 2) {
+            pal_write(2, "ld.so: missing target executable\nTry '--help' for usage.\n", 57);
+            pal_exit(1);
+        }
 
-    sp[0] = (uintptr_t)(argc - 1);
-    memmove(&sp[1], &sp[2], total_words * sizeof(uintptr_t));
+        const char *arg1 = argv[1];
+        if (streq_icase(arg1, "--help") || streq_icase(arg1, "-h")) {
+            print_help();
+            pal_exit(0);
+        } else if (streq_icase(arg1, "-v") || streq_icase(arg1, "--version")) {
+            print_version();
+            pal_exit(0);
+        }
+
+        entry_point = load_module(arg1, 1);
+        if (!entry_point) {
+            pal_write(2, "ld.so: failed to load target executable or shared libraries\n", 60);
+            pal_exit(1);
+        }
+    }
+
+    relocate_all();
+
+    if (!is_interpreter_mode) {
+        for (Elf64_auxv_t *a = auxv; a->a_type != AT_NULL; a++) {
+            switch (a->a_type) {
+                case AT_PHDR:   a->a_un.a_val = g_target_info.phdr; break;
+                case AT_PHENT:  a->a_un.a_val = g_target_info.phent; break;
+                case AT_PHNUM:  a->a_un.a_val = g_target_info.phnum; break;
+                case AT_ENTRY:  a->a_un.a_val = g_target_info.entry; break;
+                case AT_BASE:   a->a_un.a_val = g_ld_base; break;
+                case AT_EXECFN: a->a_un.a_val = (uintptr_t)argv[1]; break;
+            }
+        }
+
+        Elf64_auxv_t *auxv_end = auxv;
+        while (auxv_end->a_type != AT_NULL) auxv_end++;
+        auxv_end++;
+
+        uintptr_t *stack_end = (uintptr_t *)auxv_end;
+        size_t total_words = stack_end - &sp[2];
+
+        sp[0] = (uintptr_t)(argc - 1);
+        memmove(&sp[1], &sp[2], total_words * sizeof(uintptr_t));
+    }
 
     __asm__ __volatile__(
-        "mov %0, %%rsp\n\t"
-        "xor %%rax, %%rax\n\t"
-        "xor %%rbx, %%rbx\n\t"
-        "xor %%rcx, %%rcx\n\t"
-        "xor %%rdx, %%rdx\n\t"
-        "xor %%rsi, %%rsi\n\t"
-        "xor %%rdi, %%rdi\n\t"
-        "xor %%rbp, %%rbp\n\t"
-        "jmp *%1\n\t"
-        :
-        : "r"(sp), "r"(entry_point)
-        : "memory"
-    );
+	    "mov %[sp], %%rsp\n\t"
+	    "mov %[entry], %%r12\n\t"
+	    "xor %%rax, %%rax\n\t"
+	    "xor %%rbx, %%rbx\n\t"
+	    "xor %%rcx, %%rcx\n\t"
+	    "xor %%rdx, %%rdx\n\t"
+	    "xor %%rsi, %%rsi\n\t"
+	    "xor %%rdi, %%rdi\n\t"
+	    "xor %%rbp, %%rbp\n\t"
+	    "jmp *%%r12\n\t"
+	    :
+	    : [sp] "r"(sp), [entry] "r"(entry_point)
+	    : "r12", "memory"
+     );
 }
 
 __asm__(

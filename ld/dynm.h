@@ -1,5 +1,5 @@
-#ifndef DYNL_H
-#define DYNL_H
+#ifndef DYNM_H
+#define DYNM_H
 
 #include <elf.h>
 #include <stddef.h>

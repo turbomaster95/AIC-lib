@@ -42,7 +42,7 @@ endif
 AIC_ROOT    = $(shell pwd)
 PREFIX      ?= /usr/local
 SYSROOT     ?= $(AIC_ROOT)/sysroot
-INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/pals/$(PLATF)/arch/$(ARCH) -I$(AIC_ROOT)/src/pals/$(PLATF)/include
+INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/platforms/$(PLATF)/arch/$(ARCH) -I$(AIC_ROOT)/src/platforms/$(PLATF)/include
 
 # Build flags
 ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
@@ -52,7 +52,7 @@ else
 endif
 
 CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
-CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra
+CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra -O0
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
 
 # Output paths
@@ -71,17 +71,17 @@ LIBM_A      = $(LIB_DIR)/libm.a
 LIBM_SO     = $(LIB_DIR)/libm.so
 
 LDSO        = $(LIB_DIR)/ld.so
-LDSO_SRC    = ld/dynlink.c src/pals/$(PLATF)/pal.c
+LDSO_SRC    = ld/dynlink.c src/platforms/$(PLATF)/pal.c
 
-RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/pals/*/*")
+RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/platforms/*/*")
 LIBM_SRCS   = $(filter src/math/%, $(RAW_SRCS))
 SRCS        = $(filter-out src/math/%, $(RAW_SRCS))
 
-ARCH_SRCS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) -name "*.c" 2>/dev/null)
-ARCH_SRCS  += src/pals/$(PLATF)/pal.c
-ARCH_ASMS   = $(shell find -L src/pals/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
+ARCH_SRCS   = $(shell find -L src/platforms/$(PLATF)/arch/$(ARCH) -name "*.c" 2>/dev/null)
+ARCH_SRCS  += src/platforms/$(PLATF)/pal.c
+ARCH_ASMS   = $(shell find -L src/platforms/$(PLATF)/arch/$(ARCH) \( -name "*.S" -o -name "*.s" \) ! -name "crt1.s" 2>/dev/null)
 ALL_SRCS    = $(SRCS) $(LIBM_SRCS) $(ARCH_SRCS)
-STARTUP     = src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
+STARTUP     = src/platforms/$(PLATF)/arch/$(ARCH)/crt1.s
 TEST_SRCS   = $(wildcard tests/*.c)
 
 OBJS        = $(SRCS:src/%.c=$(OBJ_DIR)/%.o)
@@ -89,7 +89,7 @@ LIBM_OBJS   = $(LIBM_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_OBJS   = $(ARCH_SRCS:src/%.c=$(OBJ_DIR)/%.o)
 ARCH_ASM_OBJS = $(ARCH_ASMS:src/%.S=$(OBJ_DIR)/%.o)
 ALL_OBJS    = $(OBJS) $(ARCH_OBJS) $(ARCH_ASM_OBJS)
-STARTUP_OBJ = $(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/crt1.o
+STARTUP_OBJ = $(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/crt1.o
 TEST_BINS   = $(TEST_SRCS:tests/%.c=bin/%)
 DEPS        = $(ALL_OBJS:.o=.d) $(LIBM_OBJS:.o=.d) $(STARTUP_OBJ:.o=.d)
 
@@ -156,22 +156,22 @@ $(OBJ_DIR)/%.o: src/%.c
 	@echo "[CC] $<"
 	@$(CC) -fPIC $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.c
+$(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/%.o: src/platforms/$(PLATF)/arch/$(ARCH)/%.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
 	@$(CC) -fPIC $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/crt1.o: src/pals/$(PLATF)/arch/$(ARCH)/crt1.s
+$(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/crt1.o: src/platforms/$(PLATF)/arch/$(ARCH)/crt1.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
 	@$(CC) -fPIC $(ASFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.S
+$(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/%.o: src/platforms/$(PLATF)/arch/$(ARCH)/%.S
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
 	@$(CC) -fPIC $(ASFLAGS)  -c $< -o $@
 
-$(OBJ_DIR)/pals/$(PLATF)/arch/$(ARCH)/%.o: src/pals/$(PLATF)/arch/$(ARCH)/%.s
+$(OBJ_DIR)/platforms/$(PLATF)/arch/$(ARCH)/%.o: src/platforms/$(PLATF)/arch/$(ARCH)/%.s
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
 	@$(CC) -fPIC $(ASFLAGS)  -c $< -o $@
@@ -189,12 +189,12 @@ bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC)
 $(LDSO): $(LDSO_SRC)
 	@mkdir -p $(dir $@)
 	@echo "[CCLD] $@"
-	@echo $(CC) -fPIC -O2 -nostdlib -e _start -shared \
+	@echo $(CC) -fPIC -O2 -nostdlib -e _start -shared $(CFLAGS) \
 		-fno-plt -fno-stack-protector -mno-red-zone \
 		-fvisibility=hidden -Wl,-Bsymbolic \
 		$(INCLUDES) \
 		$^ -o $@
-	@$(CC) -fPIC -O2 -nostdlib -e _start -shared \
+	@$(CC) -fPIC -O2 -nostdlib -e _start -shared $(CFLAGS) \
 		-fno-plt -fno-stack-protector -mno-red-zone \
 		-fvisibility=hidden -Wl,-Bsymbolic \
 		$(INCLUDES) \
