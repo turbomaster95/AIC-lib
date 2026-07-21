@@ -1,5 +1,5 @@
 #include <termios.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <string.h>
@@ -12,7 +12,7 @@ int ioctl(int fd, unsigned long request, ...) {
     arg = va_arg(ap, void *);
     va_end(ap);
     
-    long ret = __syscall3(SYS_ioctl, (long)fd, (long)request, (long)arg);
+    long ret = pal_ioctl(fd, request, arg);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -28,7 +28,7 @@ int tcgetattr(int fd, struct termios *termios_p) {
         return -1;
     }
     
-    long ret = __syscall3(SYS_ioctl, (long)fd, TCGETS, (long)termios_p);
+    long ret = pal_ioctl(fd, TCGETS, termios_p);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -61,7 +61,7 @@ int tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
             return -1;
     }
     
-    long ret = __syscall3(SYS_ioctl, (long)fd, request, (long)termios_p);
+    long ret = pal_ioctl(fd, request, termios_p);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -72,7 +72,7 @@ int tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
 }
 
 int tcflush(int fd, int queue_selector) {
-    long ret = __syscall3(SYS_ioctl, (long)fd, TCFLSH, (long)queue_selector);
+    long ret = pal_ioctl(fd, TCFLSH, (void *)(uintptr_t)queue_selector);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -83,7 +83,7 @@ int tcflush(int fd, int queue_selector) {
 }
 
 int tcflow(int fd, int action) {
-    long ret = __syscall3(SYS_ioctl, (long)fd, TCXONC, (long)action);
+    long ret = pal_ioctl(fd, TCXONC, (void *)(uintptr_t)action);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -94,7 +94,7 @@ int tcflow(int fd, int action) {
 }
 
 int tcsendbreak(int fd, int duration) {
-    long ret = __syscall3(SYS_ioctl, (long)fd, TCSBRK, (long)0);
+    long ret = pal_ioctl(fd, TCSBRK, 0);
     
     if (ret < 0) {
         errno = (int)(-ret);
@@ -105,7 +105,7 @@ int tcsendbreak(int fd, int duration) {
 }
 
 int tcdrain(int fd) {
-    long ret = __syscall3(SYS_ioctl, (long)fd, TCSBRK, (long)1);
+    long ret = pal_ioctl(fd, TCSBRK, (void *)(uintptr_t)1);
     
     if (ret < 0) {
         errno = (int)(-ret);

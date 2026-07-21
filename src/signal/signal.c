@@ -1,9 +1,8 @@
 #include <signal.h>
 #include <unistd.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <errno.h>
 
-/* Simple signal handler table - for freestanding use */
 static sighandler_t signal_handlers[_NSIG] = {0};
 
 int sigemptyset(sigset_t *set) {
@@ -92,17 +91,6 @@ int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
         signal_handlers[signum] = act->sa_handler;
     }
     
-    /* 
-     * Note: This is a stub implementation. Real signal handling
-     * requires the rt_sigaction syscall. For a full implementation:
-     * 
-     * #ifdef __aarch64__
-     * long ret = __syscall4(__NR_rt_sigaction, signum, (long)act, (long)oldact, sizeof(sigset_t));
-     * #else
-     * long ret = __syscall4(__NR_rt_sigaction, signum, (long)act, (long)oldact, 8);
-     * #endif
-     */
-    
     return 0;
 }
 
@@ -122,7 +110,7 @@ int kill(pid_t pid, int sig) {
         return -1;
     }
     
-    long ret = __syscall2(SYS_kill, (long)pid, (long)sig);
+    long ret = pal_kill((long)pid, (long)sig);
     
     if (ret < 0) {
         errno = (int)(-ret);

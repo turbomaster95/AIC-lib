@@ -1,5 +1,5 @@
 #include <sys/utsname.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <errno.h>
 #include <string.h>
 
@@ -9,7 +9,7 @@ int uname(struct utsname *buf) {
         return -1;
     }
     
-    long ret = __syscall1(SYS_uname, (long)buf);
+    long ret = pal_uname(buf);
     
     if (ret < 0) {
         errno = (int)(-ret);

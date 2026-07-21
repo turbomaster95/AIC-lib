@@ -1,6 +1,7 @@
 #include <sys/select.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 #include <errno.h>
+#include <stddef.h>
 
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout) {
     if (nfds < 0 || nfds > FD_SETSIZE) {
@@ -8,28 +9,43 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
         return -1;
     }
 
-    long ret = __syscall5(SYS_select, (long)nfds, (long)readfds, (long)writefds, (long)exceptfds, (long)timeout);
+    struct timespec ts;
+    struct timespec *pts = NULL;
+
+    if (timeout) {
+        ts.tv_sec = timeout->tv_sec;
+        ts.tv_nsec = timeout->tv_usec * 1000;
+        pts = &ts;
+    }
+
+    int ret = pal_pselect(nfds, readfds, writefds, exceptfds, pts, NULL);
 
     if (ret < 0) {
-        errno = (int)(-ret);
+        errno = -ret;
         return -1;
     }
-    
-    return (int)ret;
+
+    if (timeout && pts) {
+        timeout->tv_sec = ts.tv_sec;
+        timeout->tv_usec = ts.tv_nsec / 1000;
+    }
+
+    return ret;
 }
 
-int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask) {
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, 
+            const struct timespec *timeout, const sigset_t *sigmask) {
     if (nfds < 0 || nfds > FD_SETSIZE) {
         errno = EINVAL;
         return -1;
     }
-    
-    long ret = __syscall6(SYS_pselect6, (long)nfds, (long)readfds, (long)writefds, (long)exceptfds, (long)timeout, (long)sigmask);
-    
+
+    int ret = pal_pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask);
+
     if (ret < 0) {
-        errno = (int)(-ret);
+        errno = -ret;
         return -1;
     }
-    
-    return (int)ret;
+
+    return ret;
 }

@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <elf.h>
 #include <string.h>
-#include <internal/syscall.h>
+#include <internal/pal.h>
 
 #define a_cas(p, t, s) __sync_val_compare_and_swap(p, t, s)
 
@@ -47,7 +47,7 @@ static inline void a_crash(void) {
 #define assert(x) do { if (!(x)) a_crash(); } while(0)
 #endif
 
-#define brk(p) ((uintptr_t)__syscall1(SYS_brk, p))
+#define brk(p) ((uintptr_t)pal_brk(p))
 
 #define mmap __mmap
 #define munmap __munmap

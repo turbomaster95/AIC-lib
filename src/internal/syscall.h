@@ -3,15 +3,16 @@
 
 #include <bits/syscall.h>
 
-// --- Process Management ---
+// --- Process Management & Arch Differences ---
 #if defined(__aarch64__)
-    #define SYS_fork   __NR_clone
-    #define SYS_open   __NR_openat
-    #define SYS_openat __NR_openat
-    #define SYS_creat  __NR_openat
-    #define SYS_unlink __NR_unlinkat
+    #define SYS_fork     __NR_clone
+    #define SYS_open     __NR_openat
+    #define SYS_openat   __NR_openat
+    #define SYS_creat    __NR_openat
+    #define SYS_unlink   __NR_unlinkat
     #define SYS_unlinkat __NR_unlinkat
-    #define SYS_mkdir  __NR_mkdirat
+    #define SYS_mkdir    __NR_mkdirat
+    #define SYS_mkdirat  __NR_mkdirat
     #define SYS_setpgid  __NR_setpgid
     #define SYS_getpgid  __NR_getpgid
     #define SYS_getpgrp  __NR_getpgrp
@@ -26,17 +27,18 @@
     #define SYS_setreuid __NR_setreuid
     #define SYS_setregid __NR_setregid
     #define SYS_select   __NR_pselect6
-
 #else
-    #define SYS_fork   __NR_fork
-    #define SYS_open   __NR_open
-    #define SYS_openat __NR_openat
-    #define SYS_creat  __NR_creat
-    #define SYS_unlink __NR_unlink
-    #define SYS_mkdir  __NR_mkdir
+    #define SYS_fork     __NR_fork
+    #define SYS_open     __NR_open
+    #define SYS_openat   __NR_openat
+    #define SYS_creat    __NR_creat
+    #define SYS_unlink   __NR_unlink
+    #define SYS_unlinkat __NR_unlinkat
+    #define SYS_mkdir    __NR_mkdir
+    #define SYS_mkdirat  __NR_mkdirat
     #define SYS_setpgid  __NR_setpgid
     #define SYS_getpgid  __NR_getpgid
-    #define SYS_select       __NR_select
+    #define SYS_select   __NR_select
     #define SYS_getpgrp  __NR_getpgrp
     #define SYS_setsid   __NR_setsid
     #define SYS_getsid   __NR_getsid
@@ -51,55 +53,57 @@
 #endif
 
 // --- Standard Mappings ---
-#define SYS_read         __NR_read
-#define SYS_write        __NR_write
-#define SYS_close        __NR_close
-#define SYS_lseek        __NR_lseek
-#define SYS_mmap         __NR_mmap
-#define SYS_munmap       __NR_munmap
-#define SYS_brk          __NR_brk
-#define SYS_mremap	 __NR_mremap
-#define SYS_mprotect     __NR_mprotect
-#define SYS_madvise	 __NR_madvise
-#define SYS_exit         __NR_exit
-#define SYS_execve       __NR_execve
-#define SYS_wait4        __NR_wait4
-#define SYS_wait         __NR_wait4
-#define SYS_getpid       __NR_getpid
-#define SYS_getppid      __NR_getppid
-#define SYS_chdir        __NR_chdir
-#define SYS_fchdir       __NR_fchdir
-#define SYS_getcwd       __NR_getcwd
-#define SYS_kill         __NR_kill
-#define SYS_ioctl        __NR_ioctl
-#define SYS_fstat        __NR_fstat
-#define SYS_stat         __NR_stat
-#define SYS_lstat        __NR_lstat
-#define SYS_newfstatat   __NR_newfstatat
-#define SYS_faccessat    __NR_faccessat
-#define SYS_fchmodat     __NR_fchmodat
-#define SYS_fchmod       __NR_fchmod
-#define SYS_fchownat     __NR_fchownat
-#define SYS_fchown       __NR_fchown
-#define SYS_chown        __NR_chown
-#define SYS_rmdir        __NR_rmdir
-#define SYS_gettimeofday __NR_gettimeofday
-#define SYS_settimeofday __NR_settimeofday
-#define SYS_time         __NR_time
-#define SYS_pipe         __NR_pipe
-#define SYS_pipe2        __NR_pipe2
-#define SYS_dup          __NR_dup
-#define SYS_dup2         __NR_dup2
-#define SYS_dup3         __NR_dup3
-#define SYS_poll         __NR_poll
-#define SYS_ppoll        __NR_ppoll
-#define SYS_pselect6     __NR_pselect6
-#define SYS_uname        __NR_uname
+#define SYS_read          __NR_read
+#define SYS_write         __NR_write
+#define SYS_close         __NR_close
+#define SYS_fcntl         __NR_fcntl
+#define SYS_lseek         __NR_lseek
+#define SYS_mmap          __NR_mmap
+#define SYS_munmap        __NR_munmap
+#define SYS_brk           __NR_brk
+#define SYS_mremap        __NR_mremap
+#define SYS_mprotect      __NR_mprotect
+#define SYS_madvise       __NR_madvise
+#define SYS_exit          __NR_exit
+#define SYS_execve        __NR_execve
+#define SYS_wait4         __NR_wait4
+#define SYS_wait          __NR_wait4
+#define SYS_getpid        __NR_getpid
+#define SYS_getppid       __NR_getppid
+#define SYS_chdir         __NR_chdir
+#define SYS_fchdir        __NR_fchdir
+#define SYS_getcwd        __NR_getcwd
+#define SYS_kill          __NR_kill
+#define SYS_ioctl         __NR_ioctl
+#define SYS_fstat         __NR_fstat
+#define SYS_stat          __NR_stat
+#define SYS_lstat         __NR_lstat
+#define SYS_newfstatat    __NR_newfstatat
+#define SYS_fstatat       __NR_newfstatat
+#define SYS_faccessat     __NR_faccessat
+#define SYS_fchmodat      __NR_fchmodat
+#define SYS_fchmod        __NR_fchmod
+#define SYS_fchownat      __NR_fchownat
+#define SYS_fchown        __NR_fchown
+#define SYS_chown         __NR_chown
+#define SYS_rmdir         __NR_rmdir
+#define SYS_gettimeofday  __NR_gettimeofday
+#define SYS_settimeofday  __NR_settimeofday
+#define SYS_time          __NR_time
+#define SYS_pipe          __NR_pipe
+#define SYS_pipe2         __NR_pipe2
+#define SYS_dup           __NR_dup
+#define SYS_dup2          __NR_dup2
+#define SYS_dup3          __NR_dup3
+#define SYS_poll          __NR_poll
+#define SYS_ppoll         __NR_ppoll
+#define SYS_pselect6      __NR_pselect6
+#define SYS_uname         __NR_uname
 #define SYS_clock_gettime __NR_clock_gettime
-#define SYS_clock_getres __NR_clock_getres
-#define SYS_nanosleep    __NR_nanosleep
-#define SYS_fsync        __NR_fsync
-#define SYS_fdatasync    __NR_fdatasync
+#define SYS_clock_getres  __NR_clock_getres
+#define SYS_nanosleep     __NR_nanosleep
+#define SYS_fsync         __NR_fsync
+#define SYS_fdatasync     __NR_fdatasync
 
 #if defined(__x86_64__)
     /**
@@ -114,9 +118,9 @@
         register long _r8  __asm__("r8")  = e;
         register long _r9  __asm__("r9")  = f;
         __asm__ volatile (
-            "syscall" 
-            : "=a"(ret) 
-            : "a"(n), "D"(a), "S"(b), "d"(c), "r"(_r10), "r"(_r8), "r"(_r9) 
+            "syscall"
+            : "=a"(ret)
+            : "a"(n), "D"(a), "S"(b), "d"(c), "r"(_r10), "r"(_r8), "r"(_r9)
             : "rcx", "r11", "memory"
         );
         return ret;
@@ -130,7 +134,7 @@
     static inline long __syscall_gen(long n, long a, long b, long c, long d, long e, long f) {
         long ret;
         __asm__ volatile (
-            "pushl %%ebp\n\t"      // Save ebp (it's a callee-saved reg and used for arg 6)
+            "pushl %%ebp\n\t"      // Save ebp
             "movl %7, %%ebp\n\t"   // Load 6th argument into ebp
             "int $0x80\n\t"        // Trigger syscall
             "popl %%ebp"           // Restore ebp
@@ -155,21 +159,21 @@
         register long _x4 __asm__("x4") = e;
         register long _x5 __asm__("x5") = f;
         __asm__ volatile (
-            "svc 0" 
-            : "+r"(_x0) 
-            : "r"(_x8), "r"(_x1), "r"(_x2), "r"(_x3), "r"(_x4), "r"(_x5) 
+            "svc 0"
+            : "+r"(_x0)
+            : "r"(_x8), "r"(_x1), "r"(_x2), "r"(_x3), "r"(_x4), "r"(_x5)
             : "memory"
         );
         return _x0;
     }
 #endif
 
-#define __syscall0(n)               __syscall_gen((long)n, 0, 0, 0, 0, 0, 0)
-#define __syscall1(n, a)            __syscall_gen((long)n, (long)a, 0, 0, 0, 0, 0)
-#define __syscall2(n, a, b)         __syscall_gen((long)n, (long)a, (long)b, 0, 0, 0, 0)
-#define __syscall3(n, a, b, c)      __syscall_gen((long)n, (long)a, (long)b, (long)c, 0, 0, 0)
-#define __syscall4(n, a, b, c, d)   __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, 0, 0)
-#define __syscall5(n, a, b, c, d, e) __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, (long)e, 0)
+#define __syscall0(n)                   __syscall_gen((long)n, 0, 0, 0, 0, 0, 0)
+#define __syscall1(n, a)                __syscall_gen((long)n, (long)a, 0, 0, 0, 0, 0)
+#define __syscall2(n, a, b)             __syscall_gen((long)n, (long)a, (long)b, 0, 0, 0, 0)
+#define __syscall3(n, a, b, c)          __syscall_gen((long)n, (long)a, (long)b, (long)c, 0, 0, 0)
+#define __syscall4(n, a, b, c, d)       __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, 0, 0)
+#define __syscall5(n, a, b, c, d, e)    __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, (long)e, 0)
 #define __syscall6(n, a, b, c, d, e, f) __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, (long)e, (long)f)
 
 #endif /* AIC_INTERNAL_SYSCALL_H */
