@@ -3,12 +3,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
-/* For AArch64 and x86_64-efi, use newfstatat syscall */
-/* Use the modern newfstatat syscall for 64-bit architectures */
 #if defined(__aarch64__) || defined(__x86_64__)
     #define SYS_newfstatat __NR_newfstatat
 #else
-    /* Fallback for 32-bit archs (ARM32, i386) which need the '64' suffix for large file support */
     #define SYS_newfstatat __NR_fstatat64
 #endif
 
@@ -140,7 +137,7 @@ int rmdir(const char *pathname) {
     }
     
 #if defined(__aarch64__)
-    long ret = __syscall2(SYS_rmdir, (long)pathname, 0);
+    long ret = __syscall4(SYS_unlinkat, AT_FDCWD, (long)pathname, AT_REMOVEDIR, 0);
 #else
     long ret = __syscall1(SYS_rmdir, (long)pathname);
 #endif

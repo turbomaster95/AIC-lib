@@ -16,7 +16,7 @@ BEGIN {
   print "#ifndef " GUARD
   print "#define " GUARD
   print ""
-  print "/* Architecture syscall numbers generated from table file*/"
+  print "/* Architecture syscall numbers generated from table file */"
   print ""
 }
 # skip comments and empty lines

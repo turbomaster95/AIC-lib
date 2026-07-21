@@ -77,7 +77,7 @@ static inline void init_secret(uintptr_t *secret) {
 #define RDLOCK_IS_EXCLUSIVE 1
 
 __attribute__((__visibility__("hidden")))
-static int __malloc_lock[1];
+extern int __malloc_lock[1];
 
 #define LOCK_OBJ_DEF \
 void __malloc_atfork(int who) { malloc_atfork(who); } \

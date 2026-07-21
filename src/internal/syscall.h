@@ -10,6 +10,7 @@
     #define SYS_openat __NR_openat
     #define SYS_creat  __NR_openat
     #define SYS_unlink __NR_unlinkat
+    #define SYS_unlinkat __NR_unlinkat
     #define SYS_mkdir  __NR_mkdirat
     #define SYS_setpgid  __NR_setpgid
     #define SYS_getpgid  __NR_getpgid
@@ -24,6 +25,8 @@
     #define SYS_setgid   __NR_setgid
     #define SYS_setreuid __NR_setreuid
     #define SYS_setregid __NR_setregid
+    #define SYS_select   __NR_pselect6
+
 #else
     #define SYS_fork   __NR_fork
     #define SYS_open   __NR_open
@@ -33,6 +36,7 @@
     #define SYS_mkdir  __NR_mkdir
     #define SYS_setpgid  __NR_setpgid
     #define SYS_getpgid  __NR_getpgid
+    #define SYS_select       __NR_select
     #define SYS_getpgrp  __NR_getpgrp
     #define SYS_setsid   __NR_setsid
     #define SYS_getsid   __NR_getsid
@@ -89,7 +93,6 @@
 #define SYS_dup3         __NR_dup3
 #define SYS_poll         __NR_poll
 #define SYS_ppoll        __NR_ppoll
-#define SYS_select       __NR_select
 #define SYS_pselect6     __NR_pselect6
 #define SYS_uname        __NR_uname
 #define SYS_clock_gettime __NR_clock_gettime

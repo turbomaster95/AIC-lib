@@ -7,9 +7,9 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
         errno = EINVAL;
         return -1;
     }
-    
+
     long ret = __syscall5(SYS_select, (long)nfds, (long)readfds, (long)writefds, (long)exceptfds, (long)timeout);
-    
+
     if (ret < 0) {
         errno = (int)(-ret);
         return -1;

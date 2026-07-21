@@ -8,6 +8,11 @@ typedef long off_t;
 
 /* Special fd values for *at functions */
 #define AT_FDCWD (-100)
+#define AT_SYMLINK_NOFOLLOW   0x100  /* Do not follow symbolic links */
+#define AT_REMOVEDIR          0x200  /* Remove directory instead of unlinking file */
+#define AT_SYMLINK_FOLLOW     0x400  /* Follow symbolic links */
+#define AT_NO_AUTOMOUNT       0x800  /* Suppress terminal automount traversal */
+#define AT_EMPTY_PATH         0x1000 /* Operate on path provided, even if empty string */
 
 /* File access modes */
 #define O_RDONLY    0x0000      /* Open for reading only */
