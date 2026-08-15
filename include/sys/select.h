@@ -7,6 +7,7 @@
 #define __NEED_mode_t
 #define __NEED_size_t
 #define __NEED_off_t
+#define __NEED_struct_timeval
 
 #if defined(__USE_GNU)
 #define __NEED_ssize_t

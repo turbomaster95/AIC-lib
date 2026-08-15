@@ -168,12 +168,33 @@ typedef unsigned long nfds_t;
 #define __DEFINED_nfds_t
 #endif
 
+#if defined(__NEED_sigset_t) && !defined(__DEFINED_sigset_t)
+typedef struct { unsigned long __bits[128/sizeof(long)]; } sigset_t;
+#define __DEFINED_sigset_t
+#endif
+
+#if defined(__NEED_struct_timespec) && !defined(__DEFINED_struct_timespec)
+struct timespec { time_t tv_sec; long tv_nsec; };
+#define __DEFINED_struct_timespec
+#endif
+
+#if defined(__NEED_struct_timeval) && !defined(__DEFINED_struct_timeval)
+struct timeval {
+	time_t tv_sec;
+	suseconds_t tv_usec;
+};
+#define __DEFINED_struct_timeval
+#endif
+
 #undef __NEED_NULL
 #undef __NEED_size_t
 #undef __NEED_ssize_t
 #undef __NEED_ptrdiff_t
 #undef __NEED_intptr_t
 #undef __NEED_uintptr_t
+#undef __NEED_sigset_t
+#undef __NEED_struct_timespec
+#undef __NEED_struct_timeval
 #undef __NEED_time_t
 #undef __NEED_clock_t
 #undef __NEED_clockid_t

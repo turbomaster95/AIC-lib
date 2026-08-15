@@ -12,10 +12,10 @@
 #define __NEED_clockid_t
 #define __NEED_nfds_t
 #define __NEED_off_t
+#define __NEED_struct_timeval
 #include <bits/alltypes.h>
 
 struct stat;
-struct timeval;
 struct timezone;
 struct timespec;
 struct pollfd;
