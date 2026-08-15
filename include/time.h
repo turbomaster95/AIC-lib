@@ -4,6 +4,30 @@
 #include <bits/types.h>
 #include <stddef.h>
 
+/* ISO C required types */
+#ifndef __time_t_defined
+#define __time_t_defined
+typedef __time_t time_t;
+#endif
+
+#ifndef __clock_t_defined
+#define __clock_t_defined
+typedef __clock_t clock_t;
+#endif
+
+#ifndef __size_t_defined
+#define __size_t_defined
+typedef __size_t size_t;
+#endif
+
+/* POSIX.1b Extensions */
+#if defined(__USE_POSIX199309) || defined(__USE_GNU)
+#ifndef __clockid_t_defined
+#define __clockid_t_defined
+typedef __clockid_t clockid_t;
+#endif
+#endif
+
 /* Time types */
 typedef long time_t;
 typedef long clock_t;
@@ -77,8 +101,5 @@ int usleep(unsigned long useconds);
 unsigned int sleep(unsigned int seconds);
 int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
 int getitimer(int which, struct itimerval *old_value);
-
-/* Clock ID type */
-typedef int clockid_t;
 
 #endif /* _TIME_H */

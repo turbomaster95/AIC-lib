@@ -4,6 +4,17 @@
 #include <bits/types.h>
 #include <time.h>
 
+typedef __dev_t     dev_t;
+typedef __ino_t     ino_t;
+typedef __mode_t    mode_t;
+typedef __nlink_t   nlink_t;
+typedef __uid_t     uid_t;
+typedef __gid_t     gid_t;
+typedef __off_t     off_t;
+typedef __blksize_t blksize_t;
+typedef __blkcnt_t  blkcnt_t;
+typedef __time_t    time_t;
+
 /* File type macros */
 #define S_IFMT      0170000
 #define S_IFSOCK    0140000

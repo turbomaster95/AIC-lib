@@ -11,6 +11,9 @@
 #define __NEED_ssize_t
 #endif
 
+typedef __size_t size_t;
+typedef __off_t  off_t;
+
 #define MAP_FAILED ((void *) -1)
 
 #define MAP_SHARED     0x01
