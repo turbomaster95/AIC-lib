@@ -1,13 +1,14 @@
 #ifndef _SYS_SELECT_H
 #define _SYS_SELECT_H
 
-#include <time.h>
-#include <signal.h>
-
+#define __NEED_time_t
+#define __NEED_suseconds_t
+#define __NEED_struct_timeval
+#define __NEED_struct_timespec
+#define __NEED_sigset_t
 #define __NEED_mode_t
 #define __NEED_size_t
 #define __NEED_off_t
-#define __NEED_struct_timeval
 
 #if defined(__USE_GNU)
 #define __NEED_ssize_t
@@ -15,6 +16,8 @@
 
 #include <bits/alltypes.h>
 #include <features.h>
+#include <time.h>
+#include <signal.h>
 
 /* fd_set size */
 #define FD_SETSIZE 1024

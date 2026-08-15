@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #define __NEED_pid_t
+#define __NEED_sigset_t
 #include <bits/alltypes.h>
 
 /* Signal numbers - Linux standard */
@@ -66,7 +67,6 @@
 #define SIG_IGN     ((__sighandler_t)1)
 
 /* Type definitions */
-typedef unsigned long sigset_t;
 typedef int sig_atomic_t;
 typedef void (*__sighandler_t)(int);
 typedef __sighandler_t sighandler_t;
