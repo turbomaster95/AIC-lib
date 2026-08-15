@@ -1,6 +1,8 @@
 #ifndef _LIMITS_H
 #define _LIMITS_H
 
+#include <features.h>
+
 #if '\xff' > 0
 #define CHAR_MIN 0
 #define CHAR_MAX 255
@@ -28,8 +30,9 @@
 
 #define MB_LEN_MAX 4
 
-#if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
- || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
+#if defined(__USE_POSIX) || defined(__USE_XOPEN) \
+ || defined(__USE_GNU) || defined(__USE_BSD) \
+ || defined(__USE_MISC)
 
 #define PIPE_BUF 4096
 #define FILESIZEBITS 64
@@ -79,7 +82,7 @@
 
 #endif
 
-#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE) || defined(_XOPEN_SOURCE)
+#if defined(__USE_GNU) || defined(__USE_BSD) || defined(__USE_XOPEN)
 
 #ifdef PAGESIZE
 #define PAGE_SIZE PAGESIZE
@@ -89,8 +92,8 @@
 
 #endif
 
-#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE) \
- || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE+0 < 700)
+#if defined(__USE_GNU) || defined(__USE_BSD) \
+ || (defined(__USE_XOPEN) && defined(__USE_POSIX200809))
 
 #define NL_NMAX 16
 

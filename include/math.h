@@ -346,12 +346,12 @@ float       truncf(float);
 long double truncl(long double);
 
 
-#if defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE)
+#if defined(__USE_XOPEN) || defined(__USE_BSD)
 #undef  MAXFLOAT
 #define MAXFLOAT        3.40282346638528859812e+38F
 #endif
 
-#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
+#if defined(__USE_XOPEN) || defined(__USE_GNU) || defined(__USE_BSD)
 #define M_E             2.7182818284590452354   /* e */
 #define M_LOG2E         1.4426950408889634074   /* log_2 e */
 #define M_LOG10E        0.43429448190325182765  /* log_10 e */
@@ -377,7 +377,7 @@ double      y1(double);
 double      yn(int, double);
 #endif
 
-#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
+#if defined(__USE_GNU) || defined(__USE_BSD)
 #define HUGE            3.40282346638528859812e+38F
 
 double      drem(double, double);
@@ -404,7 +404,7 @@ float       y1f(float);
 float       ynf(int, float);
 #endif
 
-#ifdef _GNU_SOURCE
+#ifdef __USE_GNU
 long double lgammal_r(long double, int*);
 
 void        sincos(double, double*, double*);

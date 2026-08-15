@@ -4,7 +4,13 @@
 extern char **environ;
 
 #include <stddef.h>
-#include <bits/types.h>
+
+#define __NEED_off_t
+#define __NEED_pid_t
+#define __NEED_gid_t
+#define __NEED_uid_t
+#define __NEED_ssize_t
+#include <bits/alltypes.h>
 
 /* File descriptor operations */
 int close(int fd);

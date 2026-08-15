@@ -1,37 +1,13 @@
 #ifndef _TIME_H
 #define _TIME_H
 
-#include <bits/types.h>
 #include <stddef.h>
 
-/* ISO C required types */
-#ifndef __time_t_defined
-#define __time_t_defined
-typedef __time_t time_t;
-#endif
-
-#ifndef __clock_t_defined
-#define __clock_t_defined
-typedef __clock_t clock_t;
-#endif
-
-#ifndef __size_t_defined
-#define __size_t_defined
-typedef __size_t size_t;
-#endif
-
-/* POSIX.1b Extensions */
-#if defined(__USE_POSIX199309) || defined(__USE_GNU)
-#ifndef __clockid_t_defined
-#define __clockid_t_defined
-typedef __clockid_t clockid_t;
-#endif
-#endif
-
-/* Time types */
-typedef long time_t;
-typedef long clock_t;
-typedef long suseconds_t;
+#define __NEED_time_t
+#define __NEED_clockid_t
+#define __NEED_clock_t
+#define __NEED_suseconds_t
+#include <bits/alltypes.h>
 
 /* Clock IDs */
 #define CLOCK_REALTIME  0

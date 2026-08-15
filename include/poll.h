@@ -1,9 +1,11 @@
 #ifndef _POLL_H
 #define _POLL_H
 
-#include <bits/types.h>
 #include <signal.h>
 #include <time.h>
+
+#define __NEED_nfds_t
+#include <bits/alltypes.h>
 
 /* Poll events */
 #define POLLIN      0x0001

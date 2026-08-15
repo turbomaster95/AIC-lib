@@ -1,10 +1,9 @@
 #ifndef _FCNTL_H
 #define _FCNTL_H
 
-#include <bits/types.h>
-
-/* File offset type */
-typedef long off_t;
+#define __NEED_off_t
+#define __NEED_pid_t
+#include <bits/alltypes.h>
 
 /* Special fd values for *at functions */
 #define AT_FDCWD (-100)

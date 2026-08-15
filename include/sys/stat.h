@@ -1,19 +1,22 @@
 #ifndef _SYS_STAT_H
 #define _SYS_STAT_H
 
-#include <bits/types.h>
 #include <time.h>
 
-typedef __dev_t     dev_t;
-typedef __ino_t     ino_t;
-typedef __mode_t    mode_t;
-typedef __nlink_t   nlink_t;
-typedef __uid_t     uid_t;
-typedef __gid_t     gid_t;
-typedef __off_t     off_t;
-typedef __blksize_t blksize_t;
-typedef __blkcnt_t  blkcnt_t;
-typedef __time_t    time_t;
+#define __NEED_mode_t
+#define __NEED_size_t
+#define __NEED_ssize_t
+#define __NEED_off_t
+#define __NEED_dev_t
+#define __NEED_ino_t
+#define __NEED_nlink_t
+#define __NEED_gid_t
+#define __NEED_uid_t
+#define __NEED_blkcnt_t
+#define __NEED_blksize_t
+#define __NEED_time_t
+
+#include <bits/alltypes.h>
 
 /* File type macros */
 #define S_IFMT      0170000

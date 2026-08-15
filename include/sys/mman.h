@@ -1,18 +1,16 @@
 #ifndef	_SYS_MMAN_H
 #define	_SYS_MMAN_H
 
-#include <bits/types.h>
-
 #define __NEED_mode_t
 #define __NEED_size_t
 #define __NEED_off_t
 
-#if defined(_GNU_SOURCE)
+#if defined(__USE_GNU)
 #define __NEED_ssize_t
 #endif
 
-typedef __size_t size_t;
-typedef __off_t  off_t;
+#include <bits/alltypes.h>
+#include <features.h>
 
 #define MAP_FAILED ((void *) -1)
 
@@ -73,7 +71,7 @@ typedef __off_t  off_t;
 #define POSIX_MADV_WILLNEED   3
 #define POSIX_MADV_DONTNEED   4
 
-#if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
+#if defined(__USE_GNU) || defined(__USE_BSD)
 #define MADV_NORMAL      0
 #define MADV_RANDOM      1
 #define MADV_SEQUENTIAL  2
@@ -101,7 +99,7 @@ typedef __off_t  off_t;
 #define MADV_SOFT_OFFLINE 101
 #endif
 
-#ifdef _GNU_SOURCE
+#ifdef __USE_GNU
 #define MREMAP_MAYMOVE 1
 #define MREMAP_FIXED 2
 #define MREMAP_DONTUNMAP 4
@@ -132,7 +130,7 @@ int munlock(const void *addr, size_t length);
 int mlockall(int flags);
 int munlockall(void);
 
-#ifdef _GNU_SOURCE
+#ifdef __USE_GNU
 
 void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...);
 #define __mremap mremap

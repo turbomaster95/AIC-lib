@@ -1,9 +1,19 @@
 #ifndef _SYS_SELECT_H
 #define _SYS_SELECT_H
 
-#include <bits/types.h>
 #include <time.h>
 #include <signal.h>
+
+#define __NEED_mode_t
+#define __NEED_size_t
+#define __NEED_off_t
+
+#if defined(__USE_GNU)
+#define __NEED_ssize_t
+#endif
+
+#include <bits/alltypes.h>
+#include <features.h>
 
 /* fd_set size */
 #define FD_SETSIZE 1024

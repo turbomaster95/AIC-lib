@@ -1,8 +1,10 @@
 #ifndef _SIGNAL_H
 #define _SIGNAL_H
 
-#include <bits/types.h>
 #include <stddef.h>
+
+#define __NEED_pid_t
+#include <bits/alltypes.h>
 
 /* Signal numbers - Linux standard */
 #define SIGHUP       1

@@ -3,7 +3,16 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <bits/types.h>
+
+#define __NEED_size_t
+#define __NEED_pid_t
+#define __NEED_gid_t
+#define __NEED_uid_t
+#define __NEED_mode_t
+#define __NEED_clockid_t
+#define __NEED_nfds_t
+#define __NEED_off_t
+#include <bits/alltypes.h>
 
 struct stat;
 struct timeval;

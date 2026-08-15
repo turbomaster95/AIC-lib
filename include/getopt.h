@@ -1,8 +1,6 @@
 #ifndef _GETOPT_H
 #define _GETOPT_H
 
-#include <bits/types.h>
-
 /* Global variables */
 extern char *optarg;
 extern int optind;

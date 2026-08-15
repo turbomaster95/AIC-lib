@@ -1,7 +1,6 @@
 #ifndef _FLOAT_H
 #define _FLOAT_H
 
-
 int __flt_rounds(void);
 #define FLT_ROUNDS (__flt_rounds())
 
