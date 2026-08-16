@@ -80,6 +80,11 @@
 #define S_IWOTH     00002       /* Others write */
 #define S_IXOTH     00001       /* Others execute */
 
+#define O_DIRECTORY     00200000  /* Must be a directory */
+#define O_NOFOLLOW      00400000  /* Do not follow links */
+#define O_CLOEXEC       02000000  /* Set close-on-exec flag */
+#define O_PATH          010000000 /* Mount point or raw fd */
+
 /* flock structure for file locking */
 struct flock {
     short l_type;               /* Lock type (F_RDLCK, F_WRLCK, F_UNLCK) */

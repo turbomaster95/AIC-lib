@@ -1,8 +1,6 @@
-#ifndef __cplusplus
 #ifndef __DEFINED_wchar_t
 typedef int wchar_t;
 #define __DEFINED_wchar_t
-#endif
 #endif
 
 #if defined(__FLT_EVAL_METHOD__) && __FLT_EVAL_METHOD__ == 2
@@ -14,13 +12,9 @@ typedef double double_t;
 #endif
 
 #if defined(__NEED_NULL) && !defined(__DEFINED_NULL)
-#  ifdef __cplusplus
-#    define NULL 0L
-#  else
-#    undef NULL
-#    define NULL ((void *)0)
-#  endif
-#  define __DEFINED_NULL
+#undef NULL
+#define NULL ((void *)0)
+#define __DEFINED_NULL
 #endif
 
 #if defined(__NEED_size_t) && !defined(__DEFINED_size_t)
@@ -116,6 +110,21 @@ typedef unsigned long dev_t;
 #if defined(__NEED_ino_t) && !defined(__DEFINED_ino_t)
 typedef unsigned long ino_t;
 #define __DEFINED_ino_t
+#endif
+
+#if defined(__NEED_wint_t) && !defined(__DEFINED_wint_t)
+typedef unsigned int wint_t;
+#define __DEFINED_wint_t
+#endif
+
+#if defined(__NEED_wctype_t) && !defined(__DEFINED_wctype_t)
+typedef unsigned long wctype_t;
+#define __DEFINED_wctype_t
+#endif
+
+#if defined(__NEED_wctrans_t) && !defined(__DEFINED_wctrans_t)
+typedef const int *wctrans_t;
+#define __DEFINED_wctrans_t
 #endif
 
 #if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)

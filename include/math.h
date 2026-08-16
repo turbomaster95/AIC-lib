@@ -420,8 +420,4 @@ float       pow10f(float);
 long double pow10l(long double);
 #endif
 
-#ifdef __cplusplus
-}
-#endif
-
 #endif

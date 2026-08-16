@@ -4,7 +4,10 @@
 #include <stddef.h>
 
 #define __NEED_pid_t
+#define __NEED_time_t
 #define __NEED_sigset_t
+#define __NEED_siginfo_t
+#define __NEED_struct_timespec
 #include <bits/alltypes.h>
 
 /* Signal numbers - Linux standard */
@@ -101,6 +104,7 @@ int sigdelset(sigset_t *set, int signum);
 int sigismember(const sigset_t *set, int signum);
 int kill(pid_t pid, int sig);
 int raise(int sig);
+int sigtimedwait(const sigset_t *restrict set, siginfo_t *restrict info, const struct timespec *restrict timeout);
 
 /* BSD compatibility */
 #define bsd_signal signal

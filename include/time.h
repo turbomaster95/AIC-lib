@@ -56,7 +56,7 @@ int clock_settime(clockid_t, const struct timespec *);
 #endif
 
 #if defined(__USE_GNU) || defined(__USE_BSD)
-int usleep(unsigned int);
+int usleep(unsigned int useconds);
 unsigned int sleep(unsigned int);
 #endif
 

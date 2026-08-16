@@ -137,11 +137,7 @@
 #endif
 
 #ifndef __THROW
-  #if defined(__cplusplus)
-    #define __THROW throw ()
-  #else
-    #define __THROW
-  #endif
+  #define __THROW
 #endif
 
 #endif /* _FEATURES_H */

@@ -47,6 +47,7 @@ int pal_fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int pal_fchmod(int fd, mode_t mode);
 int pal_mkdirat(int dirfd, const char *pathname, mode_t mode);
 int pal_unlinkat(int dirfd, const char *pathname, int flags);
+long pal_getdents64(int dirfd, char *buf, size_t size);
 
 // Misc
 int pal_pipe(int pipefd[2]);

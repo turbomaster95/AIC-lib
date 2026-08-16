@@ -10,6 +10,7 @@ extern char **environ;
 #define __NEED_gid_t
 #define __NEED_uid_t
 #define __NEED_ssize_t
+#define __NEED_useconds_t
 #include <bits/alltypes.h>
 
 /* File descriptor operations */
@@ -30,6 +31,7 @@ pid_t fork(void);
 pid_t getpid(void);
 pid_t getppid(void);
 int execve(const char *filename, char *const argv[], char *const envp[]);
+int execv(const char *path, char *const argv[]);
 int chdir(const char *path);
 int fchdir(int fd);
 char *getcwd(char *buf, size_t size);
@@ -52,6 +54,11 @@ pid_t getsid(pid_t pid);
 
 /* Process groups */
 int setpgrp(void);
+
+/* Misc */
+extern char *optarg;
+extern int optind, opterr, optopt;
+int getopt(int argc, char * const argv[], const char *optstring);
 
 /* Standard file descriptors */
 #define STDIN_FILENO  0
@@ -78,6 +85,8 @@ int setpgrp(void);
 #define _SC_PAGESIZE               30
 #define _SC_NPROCESSORS_CONF       64
 #define _SC_NPROCESSORS_ONLN       65
+#define _SC_PAGE_SIZE           30
+#define _SC_PAGESIZE            _SC_PAGE_SIZE
 
 /* Pathconf constants */
 #define _PC_LINK_MAX                0
@@ -94,7 +103,7 @@ long fpathconf(int fd, int name);
 
 /* Sleep functions */
 unsigned int sleep(unsigned int seconds);
-int usleep(unsigned long useconds);
+int usleep(unsigned int useconds);
 
 /* Other */
 int chown(const char *pathname, uid_t owner, gid_t group);

@@ -10,5 +10,6 @@ pid_t waitpid(pid_t pid, int *status, int options);
 #define WIFEXITED(s)   (((s) & 0x7f) == 0)
 #define WEXITSTATUS(s) (((s) >> 8) & 0xff)
 #define WTERMSIG(s)    ((s) & 0x7f)
+#define WIFSIGNALED(s)  (((signed char)(((s) & 0x7f) + 1) >> 1) > 0)
 
 #endif

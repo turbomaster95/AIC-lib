@@ -1,36 +1,22 @@
-#ifndef CTYPE_H
-#define CTYPE_H
+#ifndef _CTYPE_H
+#define _CTYPE_H
 
-static inline int isdigit(int c) {
-	return (unsigned)c - '0' < 10;
-}
+int isalnum(int c);
+int isalpha(int c);
+int isblank(int c);
+int iscntrl(int c);
+int isdigit(int c);
+int isgraph(int c);
+int islower(int c);
+int isprint(int c);
+int ispunct(int c);
+int isspace(int c);
+int isupper(int c);
+int isxdigit(int c);
+int isascii(int c);
 
-static inline int isalpha(int c) {
-	return ((unsigned)c | 32) - 'a' < 26;
-}
+int tolower(int c);
+int toupper(int c);
+int toascii(int c);
 
-static inline int isalnum(int c) {
-	return isdigit(c) || isalpha(c);
-}
-
-static inline int isspace(int c) {
-	return c == ' ' || (unsigned)c - '\t' < 5;
-}
-
-static inline int isupper(int c) {
-	return (unsigned)c - 'A' < 26;
-}
-
-static inline int islower(int c) {
-	return (unsigned)c - 'a' < 26;
-}
-
-static inline int toupper(int c) {
-	return islower(c) ? (c - 0x20) : c;
-}
-
-static inline int tolower(int c) {
-	return isupper(c) ? (c + 0x20) : c;
-}
-
-#endif
+#endif /* _CTYPE_H */
