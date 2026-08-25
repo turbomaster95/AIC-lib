@@ -53,91 +53,8 @@ typedef enum {
     LENGTH_J,       /* intmax_t */
     LENGTH_Z,       /* size_t */
     LENGTH_T,       /* ptrdiff_t */
-    LENGTH_LDBL,    /* long double */
+    LENGTH_LDBL,    /* long double (mapped to double fallback) */
 } length_modifier_t;
-
-__attribute__((weak)) int __fpclassifyl(long double x) {
-    union {
-        long double ld;
-        struct {
-            unsigned long long mantissa;
-            unsigned short exp_sign;
-            unsigned short pad[3];
-        } x87;
-        struct {
-            unsigned long long mantissa;
-            unsigned short exp_sign;
-        } d64;
-    } u;
-    u.ld = x;
-
-    if (sizeof(long double) == 12 || sizeof(long double) == 16) {
-        unsigned short exp = u.x87.exp_sign & 0x7FFF;
-        unsigned long long mant = u.x87.mantissa;
-
-        if (exp == 0) {
-            return (mant == 0) ? FP_ZERO : FP_SUBNORMAL;
-        }
-        if (exp == 0x7FFF) {
-            return (mant == 0x8000000000000000ULL) ? FP_INFINITE : FP_NAN;
-        }
-        return FP_NORMAL;
-    } else {
-        unsigned short exp = u.d64.exp_sign & 0x7FF;
-        unsigned long long mant = u.d64.mantissa & 0x000FFFFFFFFFFFFFULL;
-
-        if (exp == 0) {
-            return (mant == 0) ? FP_ZERO : FP_SUBNORMAL;
-        }
-        if (exp == 0x7FF) {
-            return (mant == 0) ? FP_INFINITE : FP_NAN;
-        }
-        return FP_NORMAL;
-    }
-}
-
-__attribute__((weak)) int __signbitl(long double x) {
-    union {
-        long double ld;
-        unsigned char bytes[sizeof(long double)];
-    } u;
-    u.ld = x;
-
-    if (sizeof(long double) == 12 || sizeof(long double) == 16) {
-        return (u.bytes[9] & 0x80) != 0;
-    } else {
-        return (u.bytes[sizeof(long double) - 1] & 0x80) != 0;
-    }
-}
-
-__attribute__((weak)) long double modfl(long double x, long double *iptr) {
-    int cls = __fpclassifyl(x);
-
-    if (cls == FP_NAN) {
-        *iptr = x;
-        return x;
-    }
-    if (cls == FP_INFINITE) {
-        *iptr = x;
-        return __signbitl(x) ? -0.0L : 0.0L;
-    }
-
-    if (x >= 9223372036854775808.0L || x <= -9223372036854775808.0L) {
-        *iptr = x;
-        return __signbitl(x) ? -0.0L : 0.0L;
-    }
-
-    long long i = (long long)x;
-    long double integer_part = (long double)i;
-
-    if (i == 0 && __signbitl(x)) {
-        *iptr = -0.0L;
-    } else {
-        *iptr = integer_part;
-    }
-
-    return x - *iptr;
-}
 
 static void output_char(vsnprintf_state_t *state, char c)
 {
@@ -210,7 +127,7 @@ static size_t uint_to_string(char *buf, size_t bufsize, uintmax_t value,
 {
     const char *digits = uppercase ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                    : "0123456789abcdefghijklmnopqrstuvwxyz";
-    char temp[64];  /* Enough for 64-bit in base 2 */
+    char temp[64];
     size_t i = 0, len = 0;
 
     if (base < 2 || base > 36) {
@@ -258,7 +175,7 @@ static void format_integer(vsnprintf_state_t *state, uintmax_t value,
                            int base, int flags, int width, int precision,
                            bool is_signed, bool is_negative)
 {
-    char num_buf[128];  /* Max for 128-bit with grouping */
+    char num_buf[128];
     size_t num_len = 0, out_len = 0;
     size_t prefix_len = 0, pad_len = 0;
     char prefix[4] = {0};
@@ -339,7 +256,7 @@ static void format_integer(vsnprintf_state_t *state, uintmax_t value,
     }
 }
 
-static void format_float(vsnprintf_state_t *state, long double value,
+static void format_float(vsnprintf_state_t *state, double value,
                          char spec, int flags, int width, int precision)
 {
     char buf[512];
@@ -347,7 +264,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
     size_t out_size = sizeof(buf);
     bool is_negative = false;
     bool is_inf = false, is_nan = false;
-    long double abs_val;
+    double abs_val;
     char sign_char = 0;
     size_t len = 0;
     size_t pad_len = 0;
@@ -407,7 +324,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
         switch (spec) {
             case 'f':
             case 'F': {
-                long double int_part, frac_part;
+                double int_part, frac_part;
                 int i, digit;
                 char *p = out;
                 size_t remaining = out_size;
@@ -417,7 +334,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
                     remaining--;
                 }
 
-                frac_part = modfl(abs_val, &int_part);
+                frac_part = modf(abs_val, &int_part);
 
                 if (int_part == 0) {
                     if (remaining > 1) {
@@ -479,7 +396,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
                 char *p = out;
                 size_t remaining = out_size;
                 int exp_val = 0;
-                long double mantissa = abs_val;
+                double mantissa = abs_val;
                 int i, digit;
 
                 if (sign_char) {
@@ -561,7 +478,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
 
             case 'g':
             case 'G': {
-                long double abs_copy = abs_val;
+                double abs_copy = abs_val;
                 int exp_val = 0;
 
                 if (abs_copy != 0) {
@@ -593,7 +510,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
                 char *p = out;
                 size_t remaining = out_size;
                 int exp_val = 0;
-                long double mantissa = abs_val;
+                double mantissa = abs_val;
                 int i;
                 const char *hex_digits = (spec == 'A') ? "0123456789ABCDEF" 
                                                         : "0123456789abcdef";
@@ -629,7 +546,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
                         remaining--;
                     }
 
-                    mantissa -= 1;  /* Remove the leading 1 */
+                    mantissa -= 1;
 
                     if (precision > 0 || (flags & FLAG_HASH)) {
                         if (remaining > 1) {
@@ -697,7 +614,7 @@ static void format_float(vsnprintf_state_t *state, long double value,
         if ((flags & FLAG_ZERO) && !is_nan && !is_inf) {
             if (sign_char) {
                 output_char(state, sign_char);
-                out++;  /* Skip sign in string */
+                out++;
                 len--;
             }
             output_padding(state, '0', pad_len);
@@ -774,7 +691,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
             continue;
         }
 
-        i++;  /* Skip '%' */
+        i++;
 
         if (format[i] == '\0') {
             output_char(&state, '%');
@@ -970,17 +887,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
             case 'G':
             case 'a':
             case 'A': {
-                long double value = 0;
-
-                switch (length) {
-                    case LENGTH_LDBL:
-                        value = va_arg(ap, long double);
-                        break;
-                    default:
-                        value = va_arg(ap, double);
-                        break;
-                }
-
+                double value = va_arg(ap, double);
                 format_float(&state, value, spec, flags, width, precision);
                 break;
             }
@@ -1045,3 +952,4 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 
     return result;
 }
+

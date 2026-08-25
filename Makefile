@@ -238,7 +238,7 @@ $(LDSO): $(LDSO_SRC)
 	@echo "[CCLD] $@"
 	@$(CC) -fPIC -O2 -nostdlib -e _start -shared $(CFLAGS) \
 		-fno-plt -fno-stack-protector -mno-red-zone \
-		-fvisibility=hidden -Wl,-Bsymbolic \
+		-fvisibility=hidden -Wl,-Bsymbolic -Wl,-z,noseparate-code \
 		$(INCLUDES) \
 		$^ -o $@
 

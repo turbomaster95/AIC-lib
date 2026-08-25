@@ -701,6 +701,10 @@ static uintptr_t init_main_from_kernel_auxv(Elf64_auxv_t *auxv, const char *exec
 
 __attribute__((visibility("hidden")))
 void _start_c(uintptr_t *sp) {
+    if (!sp) {
+        pal_write(2, "ld.so: invalid stack pointer\n", 30);
+        pal_exit(1);
+    }
     self_relocate(sp);
     int argc = (int)sp[0]; char **argv = (char **)&sp[1];
     g_envp = &argv[argc + 1];

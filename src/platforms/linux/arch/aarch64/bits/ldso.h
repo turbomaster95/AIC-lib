@@ -10,10 +10,10 @@
         ".type _start, %function\n" \
         "_start:\n" \
         "    mov x0, sp\n" \
+        "    bic sp, x0, #15\n" \
         "    bl _start_c\n" \
         "1:  b 1b\n" \
     )
-
 
 #define AAL_DEFINE_DL_RUNTIME_RESOLVE() \
     __asm__( \

@@ -9,9 +9,17 @@
 #include <string.h>
 #include <internal/pal.h>
 
-#define a_cas(p, t, s) __sync_val_compare_and_swap(p, t, s)
+#undef a_cas
+#define a_cas(p, t, s) __extension__ ({ \
+    __typeof(*(p)) _old = (t); \
+    __atomic_compare_exchange_n((p), &_old, (s), 0, \
+                                __ATOMIC_SEQ_CST, \
+                                __ATOMIC_SEQ_CST); \
+    _old; \
+})
 
-#define a_store(p, v) __atomic_store_n(p, v, __ATOMIC_RELEASE)
+#undef a_store
+#define a_store(p, v) __atomic_store_n((p), (v), __ATOMIC_RELEASE)
 
 #define a_and(p, v) __sync_fetch_and_and(p, v)
 #define a_or(p, v)  __sync_fetch_and_or(p, v)
