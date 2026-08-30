@@ -20,7 +20,10 @@ typedef struct {
 #endif
 
 /* Function declarations */
-int setjmp(jmp_buf env);
-void longjmp(jmp_buf env, int val);
+int _setjmp(jmp_buf env);
+void _longjmp(jmp_buf env, int val);
+
+#define setjmp(env) _setjmp(env);
+#define longjmp(env, val) _longjmp(env, val)
 
 #endif /* _SETJMP_H */

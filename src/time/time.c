@@ -5,6 +5,7 @@
 #include <internal/syscall.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
 
 time_t time(time_t *tloc) {
     struct timeval tv;
@@ -93,7 +94,6 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result) {
 
     time_t t = *timep;
 
-    /* Simple UTC conversion - doesn't handle all edge cases */
     result->tm_sec = t % 60;
     t /= 60;
     result->tm_min = t % 60;
@@ -101,11 +101,9 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result) {
     result->tm_hour = t % 24;
     t /= 24;
 
-    /* Days since epoch */
     result->tm_yday = 0;
     result->tm_wday = (t + 4) % 7;  /* Jan 1, 1970 was Thursday */
 
-    /* Approximate year/month/day */
     int days = (int)t;
     int year = 1970;
     while (days >= 365) {
@@ -117,7 +115,6 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result) {
     }
     result->tm_year = year - 1900;
 
-    /* Approximate month */
     static const int month_days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     int leap = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
     int month = 0;
@@ -136,7 +133,6 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result) {
 }
 
 struct tm *localtime_r(const time_t *timep, struct tm *result) {
-    /* For now, just return gmtime - proper timezone support is complex */
     return gmtime_r(timep, result);
 }
 
@@ -146,20 +142,16 @@ time_t mktime(struct tm *tm) {
         return (time_t)-1;
     }
 
-    /* Simplified conversion - doesn't handle all edge cases */
     int year = tm->tm_year + 1900;
     int days = 0;
 
-    /* Days from years */
     for (int y = 1970; y < year; y++) {
         days += 365 + (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0));
     }
 
-    /* Days from months */
     static const int month_days[] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
     days += month_days[tm->tm_mon];
 
-    /* Leap year adjustment */
     if (tm->tm_mon > 1 && (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))) {
         days++;
     }
@@ -234,4 +226,24 @@ unsigned int sleep(unsigned int seconds) {
     }
 
     return 0;
+}
+
+clock_t clock(void) {
+    struct timespec ts;
+    //if (pal_clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) == 0) {
+    //    return (clock_t)(ts.tv_sec * CLOCKS_PER_SEC + ts.tv_nsec / (1000000000 / CLOCKS_PER_SEC));
+    //}
+    return (clock_t)-1;
+}
+
+double difftime(time_t time1, time_t time0) {
+    return (double)(time1 - time0);
+}
+
+size_t strftime(char *s, size_t max, const char *format, const struct tm *tm) {
+    (void)tm;
+    if (max == 0) return 0;
+    strncpy(s, format, max - 1);
+    s[max - 1] = '\0';
+    return strlen(s);
 }

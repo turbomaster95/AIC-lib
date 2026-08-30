@@ -1,30 +1,14 @@
-/*
- * x86_64 setjmp/longjmp implementation
- * 
- * jmp_buf layout (112 bytes):
- *   [0-7]    rbx
- *   [8-15]   rbp
- *   [16-23]  r12
- *   [24-31]  r13
- *   [32-39]  r14
- *   [40-47]  r15
- *   [48-55]  rsp (stack pointer)
- *   [56-63]  rip (return address)
- *   [64-71]  rflags
- *   [72-111] padding and optional FP registers
- */
-
 .section .text
 
 /*
- * int setjmp(jmp_buf env)
+ * int _setjmp(jmp_buf env)
  * 
  * Saves the current execution context to env.
- * Returns 0 when called directly, non-zero when returning from longjmp.
+ * Returns 0 when called directly, non-zero when returning from _longjmp.
  */
-.globl setjmp
-.type setjmp, @function
-setjmp:
+.globl _setjmp
+.type _setjmp, @function
+_setjmp:
     /* Save callee-saved registers */
     movq %rbx, 0(%rdi)
     movq %rbp, 8(%rdi)
@@ -50,14 +34,14 @@ setjmp:
     ret
 
 /*
- * void longjmp(jmp_buf env, int val)
+ * void _longjmp(jmp_buf env, int val)
  * 
  * Restores the execution context from env.
- * The setjmp() call will appear to return with value val (or 1 if val is 0).
+ * The _setjmp() call will appear to return with value val (or 1 if val is 0).
  */
-.globl longjmp
-.type longjmp, @function
-longjmp:
+.globl _longjmp
+.type _longjmp, @function
+_longjmp:
     /* Restore callee-saved registers */
     movq 0(%rdi), %rbx
     movq 8(%rdi), %rbp

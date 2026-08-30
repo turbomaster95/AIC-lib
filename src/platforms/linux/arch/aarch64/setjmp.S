@@ -1,26 +1,14 @@
-/*
- * AArch64 setjmp/longjmp implementation
- * 
- * jmp_buf layout (168 bytes):
- *   [0-79]   x19-x28 (10 registers * 8 bytes)
- *   [80-87]  x29 (frame pointer)
- *   [88-95]  x30 (link register)
- *   [96-103] sp (stack pointer)
- *   [104-111] pc (program counter - stored in x0 on return)
- *   [112-175] d8-d15 (8 FP registers * 8 bytes)
- */
-
 .section .text
 
 /*
- * int setjmp(jmp_buf env)
+ * int _setjmp(jmp_buf env)
  * 
  * Saves the current execution context to env.
  * Returns 0 when called directly, non-zero when returning from longjmp.
  */
-.globl setjmp
-.type setjmp, %function
-setjmp:
+.globl _setjmp
+.type _setjmp, %function
+_setjmp:
     /* Save callee-saved registers x19-x28 */
     str x19, [x0, #0]
     str x20, [x0, #8]
@@ -60,18 +48,18 @@ setjmp:
     ret
 
 /*
- * void longjmp(jmp_buf env, int val)
+ * void _longjmp(jmp_buf env, int val)
  * 
  * Restores the execution context from env.
- * The setjmp() call will appear to return with value val (or 1 if val is 0).
+ * The _setjmp() call will appear to return with value val (or 1 if val is 0).
  * 
  * Arguments on entry:
  *   x0 = env (jmp_buf)
  *   x1 = val (return value)
  */
-.globl longjmp
-.type longjmp, %function
-longjmp:
+.globl _longjmp
+.type _longjmp, %function
+_longjmp:
     /* Save the return value before we overwrite x1 */
     mov x2, x1
     

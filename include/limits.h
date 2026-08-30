@@ -21,8 +21,16 @@
 #define INT_MIN  (-1-0x7fffffff)
 #define INT_MAX  0x7fffffff
 #define UINT_MAX 0xffffffffU
+
+#if __LONG_WIDTH__ == 64
+#define LONG_MAX 0x7fffffffffffffffL
+#elif __LONG_WIDTH__ == 32
+#define LONG_MAX 0x7fffffffL
+#else
+#error "Unsupported long width"
+#endif
+
 #define LONG_MIN (-LONG_MAX-1)
-#define LONG_MAX __LONG_MAX
 #define ULONG_MAX (2UL*LONG_MAX+1)
 #define LLONG_MIN (-LLONG_MAX-1)
 #define LLONG_MAX  0x7fffffffffffffffLL

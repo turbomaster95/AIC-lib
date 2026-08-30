@@ -1,8 +1,6 @@
 #ifndef _ERRNO_H
 #define _ERRNO_H
 
-extern int errno;
-
 /* Taken from the linux source code at include/uapi/asm-generic */
 
 #line 1 "errno-base.h"
@@ -162,6 +160,7 @@ extern int errno;
 
 #define EHWPOISON	133	/* Memory page has hardware error */
 
-#define __errno_location() (&errno)
+int *__errno_location(void);
+extern int errno;
 
 #endif /* _ERRNO_H */

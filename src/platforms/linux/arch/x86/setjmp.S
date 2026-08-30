@@ -1,18 +1,18 @@
 .code32 
 .text
-.global setjmp
-.global longjmp
-.type setjmp, @function
-.type longjmp, @function
+.global _setjmp
+.global _longjmp
+.type _setjmp, @function
+.type _longjmp, @function
 
-setjmp:
+_setjmp:
     movl    4(%esp), %eax          # eax = jmp_buf pointer
     movl    %ebx, 0(%eax)
     movl    %ebp, 4(%eax)
     movl    %esi, 8(%eax)
     movl    %edi, 12(%eax)
 
-    # Save the ESP as it should be AFTER setjmp returns
+    # Save the ESP as it should be AFTER _setjmp returns
     leal    4(%esp), %edx          
     movl    %edx, 16(%eax)         
 
@@ -27,7 +27,7 @@ setjmp:
     xorl    %eax, %eax
     ret
 
-longjmp:
+_longjmp:
     movl    4(%esp), %edx          # edx = jmp_buf pointer
     movl    8(%esp), %eax          # eax = val
 

@@ -20,7 +20,7 @@ PLATF  ?= linux
 CC      = clang
 HOSTCC  = gcc
 AR      = ar
-LD      = ld.lld
+LD     ?= ld.lld
 OBJCOPY = objcopy
 IS_ANDROID = $(shell uname -o | grep -qi "android" && echo yes || echo no)
 
