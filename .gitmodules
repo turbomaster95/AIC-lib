@@ -1,0 +1,3 @@
+[submodule "third-party/misan"]
+	path = third-party/misan
+	url = https://github.com/turbomaster95/misan

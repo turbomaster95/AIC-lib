@@ -21,6 +21,11 @@ int __libc_start_main(
 
     environ = envp;
 
+    #ifdef SAN_ENABLED
+    extern void __asan_init(void);
+    __asan_init();
+    #endif
+
     int result = main_ptr(argc, argv, envp);
 
     if (fini_func) {

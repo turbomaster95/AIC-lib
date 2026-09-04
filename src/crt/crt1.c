@@ -14,7 +14,7 @@ extern int __libc_start_main(
     void (*ldso)(void)
 );
 
-__attribute__((__visibility__("hidden")))
+__attribute__((__visibility__("hidden"), no_sanitize("address", "undefined"), noinline))
 void _start_c(long *p)
 {
     int argc = (int)p[0];

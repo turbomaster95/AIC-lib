@@ -17,11 +17,12 @@ endif
 
 ARCH   ?= $(shell uname -m)
 PLATF  ?= linux
-CC      = clang
-HOSTCC  = gcc
-AR      = ar
+CC     = clang
+HOSTCC = gcc
+AR     ?= ar
+RANLIB ?= ranlib
 LD     ?= ld.lld
-OBJCOPY = objcopy
+OBJCOPY ?= objcopy
 IS_ANDROID = $(shell uname -o | grep -qi "android" && echo yes || echo no)
 
 ifeq ($(strip $(CCACHE)),)
@@ -54,7 +55,7 @@ else
     ARCFLAGS += -m64
 endif
 
-DEPFLAGS    = -MF $(dir $@).$(notdir $(@:.o=.d))
+DEPFLAGS    = -MF$(dir $@).$(notdir $(@:.o=.d))
 CFLAGS      = $(ARCFLAGS) $(INCLUDES) -MMD -MP $(DEPFLAGS) -nostdinc -nostdlib -ffreestanding -Wall -O2 -fno-stack-protector -fPIC -w
 CFLAGS_DBG  = $(ARCFLAGS) $(INCLUDES) -MMD -MP $(DEPFLAGS) -nostdinc -nostdlib -ffreestanding -Wall -g -fno-stack-protector -fPIC -Wall -Wextra -O0
 ASFLAGS     = $(ARCFLAGS) $(INCLUDES) -nostdlib -Wall
@@ -137,8 +138,44 @@ CFLAGS += $(OCFLAGS) $(PLAT_FLAGS)
 ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
+PREQS := dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LIBT) $(LDSO) $(TEST_BINS)
+
+ifdef SAN
+MISAN_DIR := third-party/misan
+MISAN_ASAN := $(MISAN_DIR)/libmisan_asan.a
+MISAN_UBSAN := $(MISAN_DIR)/libmisan_ubsan.a
+
+.PHONY: misan
+misan:
+	@printf "[BUILD]\t third-party/misan...\n"
+	@$(MAKE) -C $(MISAN_DIR) static CC="$(CC)" AR="$(AR)" RANLIB="$(RANLIB)"
+
+TCFL := $(PREQS)
+PREQS := misan $(TCFL)
+CFLAGS += -fsanitize=address,undefined -DSAN_ENABLED
+ASFLAGS += -Lthird-party/misan -lmisan_asan -lmisan_ubsan
+LDFLAGS += -Lthird-party/misan -lmisan_asan -lmisan_ubsan
+
+LLVM_AR := $(shell command -v llvm-ar 2>/dev/null)
+
+merge_sanitizers = \
+	$(if $(LLVM_AR),\
+		$(LLVM_AR) --format=gnu rc $@ $^ $(MISAN_ASAN) $(MISAN_UBSAN),\
+		@echo "CREATE $@" > merge.mri && \
+		echo "ADDLIB $@" >> merge.mri && \
+		echo "ADDLIB $(MISAN_ASAN)" >> merge.mri && \
+		echo "ADDLIB $(MISAN_UBSAN)" >> merge.mri && \
+		echo "SAVE" >> merge.mri && \
+		echo "END" >> merge.mri && \
+		$(AR) -M < merge.mri && \
+		rm -f merge.mri\
+	)
+endif
+
+LD_SO_CFLAGS := $(filter-out -fsanitize=% -MMD -MP -MF%,$(CFLAGS) $(OCFLAGS))
+
 .PHONY: all
-all: dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LIBT) $(LDSO) $(TEST_BINS)
+all: $(PREQS)
 	@echo "[AIC] Build complete."
 
 .PHONY: dirs
@@ -148,7 +185,19 @@ dirs:
 $(LIB_STATIC): $(ALL_OBJS) $(CRT_OBJS)
 	@mkdir -p $(dir $@)
 	@echo "[AR] $@"
-	@$(AR) rcs $@ $(ALL_OBJS)
+	@$(AR) rcs $@.tmp $(ALL_OBJS)
+ifdef SAN
+	@printf "[MERGE]\t Adding misan sanitizers to $@\n"
+	@printf "CREATE $@\n" > $@.mri
+	@printf "ADDLIB $@.tmp\n" >> $@.mri
+	@printf "ADDLIB third-party/misan/libmisan_asan.a\n" >> $@.mri
+	@printf "ADDLIB third-party/misan/libmisan_ubsan.a\n" >> $@.mri
+	@printf "SAVE\nEND\n" >> $@.mri
+	@$(AR) -M < $@.mri
+	@rm -f $@.mri
+else
+	@mv $@.tmp $@
+endif
 
 $(LIB_SHARED): $(ALL_OBJS) $(CRT_OBJS)
 	@mkdir -p $(dir $@)
@@ -176,27 +225,27 @@ $(LIBC_SO): $(LIB_SHARED)
 $(CRT1_OBJ): $(CRT_SRC_DIR)/crt1.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -fno-PIC -c $< -o $@
+	@$(CC) $(CFLAGS) -fno-sanitize=address,undefined -fno-PIC -c $< -o $@
 
 $(SCRT1_OBJ): $(CRT_SRC_DIR)/Scrt1.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -fPIE -c $< -o $@
+	@$(CC) $(CFLAGS) -fPIE -fno-sanitize=address,undefined -c $< -o $@
 
 $(RCRT1_OBJ): $(CRT_SRC_DIR)/rcrt1.c
 	@mkdir -p $(dir $@)
 	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -fPIE -DSTATIC_PIE -c $< -o $@
+	@$(CC) $(CFLAGS) -fPIE -DSTATIC_PIE -fno-sanitize=address,undefined -c $< -o $@
 
 $(CRTI_OBJ): $(wildcard $(CRT_ARCH_DIR)/crti.S $(CRT_ARCH_DIR)/crti.s)
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@$(CC) $(ASFLAGS) -c $< -o $@
+	@$(CC) $(ASFLAGS) -fno-sanitize=address,undefined -c $< -o $@
 
 $(CRTN_OBJ): $(wildcard $(CRT_ARCH_DIR)/crtn.S $(CRT_ARCH_DIR)/crtn.s)
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
-	@$(CC) $(ASFLAGS) -c $< -o $@
+	@$(CC) $(ASFLAGS) -fno-sanitize=address,undefined -c $< -o $@
 
 $(LIBT): $(RCRT1_OBJ) $(SCRT1_OBJ) $(CRT1_OBJ) $(CRTI_OBJ) $(CRTN_OBJ)
 	@echo "[CP] $^"
@@ -236,10 +285,10 @@ bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC) $(LIBM_A)
 $(LDSO): $(LDSO_SRC)
 	@mkdir -p $(dir $@)
 	@echo "[CCLD] $@"
-	@$(CC) -fPIC -O2 -nostdlib -e _start -shared $(CFLAGS) \
+	@echo $(LD_SO_CFLAGS)
+	@$(CC) -fPIC -O2 -nostdlib -e _start -shared $(LD_SO_CFLAGS) \
 		-fno-plt -fno-stack-protector -mno-red-zone \
 		-fvisibility=hidden -Wl,-Bsymbolic -Wl,-z,noseparate-code \
-		$(INCLUDES) \
 		$^ -o $@
 
 .PHONY: install install-sysroot sysroot
