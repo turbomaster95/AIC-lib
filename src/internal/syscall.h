@@ -104,6 +104,7 @@
 #define SYS_nanosleep     __NR_nanosleep
 #define SYS_fsync         __NR_fsync
 #define SYS_fdatasync     __NR_fdatasync
+#define SYS_sched_yield   __NR_sched_yield
 
 #if defined(__x86_64__)
     /**

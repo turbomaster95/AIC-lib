@@ -1,14 +1,24 @@
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <stdio.h>
+#include <internal/pal.h>
+#include <time.h>
+
+uint64_t drt_arch_get_time_ns(void) {
+    struct timespec ts;
+    pal_clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((uint64_t)ts.tv_sec * 1000000000ULL) + (uint64_t)ts.tv_nsec;
+}
+
+void drt_arch_yield(void) {
+    pal_sched_yield();
+}
 
 void drt_arch_print_string(const char *str) {
-    volatile unsigned char *uart = (volatile unsigned char *)0x3F8;
-    while (*str) {
-        *uart = *str++;
-        for (volatile int i = 0; i < 100; i++) __asm__ volatile("" ::: "memory");
-    }
+	puts(str);
 }
 
 _Noreturn void drt_arch_abort(void) {
@@ -41,14 +51,4 @@ int drt_arch_map_shadow_memory(uintptr_t addr, size_t size) {
     }
 
     return 0;
-}
-
-uint64_t drt_arch_get_time_ns(void) {
-    unsigned lo, hi;
-    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
-    return ((uint64_t)hi << 32) | lo;
-}
-
-void drt_arch_yield(void) {
-    __asm__ volatile ("pause" ::: "memory");
 }

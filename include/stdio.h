@@ -42,6 +42,7 @@ int dprintf(int fd, const char *format, ...);
 int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 int putchar(int c);
 int getchar(void);
+int puts(const char *s);
 int putc(int c, FILE *stream);
 int getc(FILE *stream);
 int fputc(int c, FILE *stream);

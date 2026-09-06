@@ -66,6 +66,10 @@ void *pal_mem_allocate(size_t size) {
     return (void *)ret;
 }
 
+int pal_sched_yield(void) {
+    return (int)__syscall0(SYS_sched_yield);
+}
+
 int pal_mem_free(void *addr, size_t size) {
     return (int)__syscall2(SYS_munmap, (long)addr, size);
 }

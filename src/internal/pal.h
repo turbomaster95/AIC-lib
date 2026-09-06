@@ -96,6 +96,7 @@ long pal_kill(long pid, long sig);
 pid_t pal_fork(void);
 pid_t pal_wait4(pid_t pid, int *wstatus, int options, void *rusage);
 int   pal_execve(const char *filename, char *const argv[], char *const envp[]);
+int  pal_sched_yield(void);
 
 #endif
 
