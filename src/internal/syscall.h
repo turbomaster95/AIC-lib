@@ -105,6 +105,7 @@
 #define SYS_fsync         __NR_fsync
 #define SYS_fdatasync     __NR_fdatasync
 #define SYS_sched_yield   __NR_sched_yield
+#define SYS_getdents64    __NR_getdents64
 
 #if defined(__x86_64__)
     /**

@@ -17,6 +17,10 @@ long pal_read(int fd, void *buf, size_t count) {
     return __syscall3(SYS_read, fd, (long)buf, count);
 }
 
+long pal_getdents64(int dirfd, char *buf, size_t size) {
+    return __syscall3(SYS_getdents64, dirfd, (long)buf, size);
+}
+
 long pal_open(const char *pathname, int flags, int mode) {
     return __syscall4(SYS_openat, AT_FDCWD, (long)pathname, flags, mode);
 }
