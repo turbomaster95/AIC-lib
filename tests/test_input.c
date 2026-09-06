@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 int main(void) {
-    printf("AIC Interactive Shell (Type something and hit Enter):\n");
+    printf("Interactive Shell (Type something and hit Enter):\n");
     printf("> ");
 
     int c;

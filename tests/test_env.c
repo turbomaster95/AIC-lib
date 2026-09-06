@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv) {
     printf("--- Environment Variables ---\n");
-    
+
     if (environ == NULL) {
         printf("Error: environ is NULL\n");
         return 1;

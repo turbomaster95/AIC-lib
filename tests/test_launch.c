@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 int main() {
-    printf("AIC Launcher v2.0\n");
+    printf("Launcher\n");
 
     long pid = __syscall1(SYS_fork, 17); // SIGCHLD = 17
 

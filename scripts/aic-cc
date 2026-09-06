@@ -1,39 +1,37 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AIC-CC - AIC Standard Library Compiler Wrapper
-# =============================================================================
-# Usage: aic-cc [options] <source.c> [-o output]
+# Usage: kora-cc [options] <source.c> [-o output]
 #
 # This script wraps GCC/Clang to compile and link programs against the
-# AIC standard library instead of the system libc.
+# Kora standard library instead of the system libc.
 # =============================================================================
 
 set -e
 
-# Detect script directory and AIC root
+# Detect script directory and Kora root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AIC_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+KORA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Auto-detect architecture
 ARCH=$(uname -m)
 
-# Default compiler (can be overridden via AIC_CC env var)
-CC="${AIC_CC:-gcc}"
+# Default compiler (can be overridden via KORA_CC env var)
+CC="${KORA_CC:-gcc}"
 
-# Find AIC build artifacts
-CRT1="$AIC_ROOT/build/objs/arch/$ARCH/crt1.o"
-LIBAIC_STATIC="$AIC_ROOT/build/lib/libaic.a"
-LIBAIC_SHARED="$AIC_ROOT/build/lib/libaic.so"
-SYSROOT="${AIC_ROOT}/sysroot"
+# Find Kora build artifacts
+CRT1="$KORA_ROOT/build/objs/arch/$ARCH/crt1.o"
+LIBKORA_STATIC="$KORA_ROOT/build/lib/libkora.a"
+LIBKORA_SHARED="$KORA_ROOT/build/lib/libkora.so"
+SYSROOT="${KORA_ROOT}/sysroot"
 
 # Include paths
-AIC_INCLUDE="$AIC_ROOT/include"
+KORA_INCLUDE="$KORA_ROOT/include"
 TOOLCHAIN_INC=$($CC -print-file-name=include 2>/dev/null || echo "")
 
 # Default flags
 CFLAGS="-nostdlib -ffreestanding -fno-stack-protector -fPIC"
 LDFLAGS="-nostdlib -static-pie"
-INCLUDES="-isystem $AIC_INCLUDE"
+INCLUDES="-isystem $KORA_INCLUDE"
 
 if [ -n "$TOOLCHAIN_INC" ] && [ -d "$TOOLCHAIN_INC" ]; then
     INCLUDES="$INCLUDES -isystem $TOOLCHAIN_INC"
@@ -84,13 +82,13 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -v|--version)
-            echo "aic-cc (AIC Standard Library) 1.0.0"
+            echo "kora-cc (Kora Standard Library) 1.0.0"
             echo "Target: $ARCH-linux-gnu"
-            echo "AIC Root: $AIC_ROOT"
+            echo "Kora Root: $KORA_ROOT"
             exit 0
             ;;
         -h|--help)
-            echo "Usage: aic-cc [options] <source.c> [-o output]"
+            echo "Usage: kora-cc [options] <source.c> [-o output]"
             echo ""
             echo "Options:"
             echo "  -o <file>      Output file name (default: a.out)"
@@ -106,7 +104,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -h, --help     Show this help message"
             echo ""
             echo "Environment Variables:"
-            echo "  AIC_CC         Override the C compiler (default: gcc)"
+            echo "  Kora_CC         Override the C compiler (default: gcc)"
             exit 0
             ;;
         -*)
@@ -122,22 +120,22 @@ done
 
 # Check for source files
 if [ ${#SOURCES[@]} -eq 0 ]; then
-    echo "aic-cc: error: no input files"
-    echo "Usage: aic-cc [options] <source.c> [-o output]"
-    echo "Try 'aic-cc --help' for more information."
+    echo "kora-cc: error: no input files"
+    echo "Usage: kora-cc [options] <source.c> [-o output]"
+    echo "Try 'kora-cc --help' for more information."
     exit 1
 fi
 
 # Check build artifacts exist
 if [ ! -f "$CRT1" ]; then
-    echo "aic-cc: error: startup file not found: $CRT1"
-    echo "Run 'make' in $AIC_ROOT first."
+    echo "kora-cc: error: startup file not found: $CRT1"
+    echo "Run 'make' in $KORA_ROOT first."
     exit 1
 fi
 
-if [ ! -f "$LIBAIC_STATIC" ]; then
-    echo "aic-cc: error: library not found: $LIBAIC_STATIC"
-    echo "Run 'make' in $AIC_ROOT first."
+if [ ! -f "$LIBKORA_STATIC" ]; then
+    echo "kora-cc: error: library not found: $LIBKORA_STATIC"
+    echo "Run 'make' in $KORA_ROOT first."
     exit 1
 fi
 
@@ -160,8 +158,8 @@ if [ $COMPILE_ONLY -eq 1 ]; then
 else
     # Compile and link
     if [ "$LINK_MODE" = "static" ]; then
-        exec $CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS "${SOURCES[@]}" $CRT1 $LIBAIC_STATIC ${EXTRA_LDFLAGS[*]} $LDFLAGS -o "$OUTPUT"
+        exec $CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS "${SOURCES[@]}" $CRT1 $LIBKORA_STATIC ${EXTRA_LDFLAGS[*]} $LDFLAGS -o "$OUTPUT"
     else
-        exec $CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS "${SOURCES[@]}" $CRT1 -L"$AIC_ROOT/build/lib" -laic ${EXTRA_LDFLAGS[*]} $LDFLAGS -o "$OUTPUT"
+        exec $CC $INCLUDES ${EXTRA_CFLAGS[*]} $CFLAGS "${SOURCES[@]}" $CRT1 -L"$KORA_ROOT/build/lib" -lkora ${EXTRA_LDFLAGS[*]} $LDFLAGS -o "$OUTPUT"
     fi
 fi

@@ -1,5 +1,5 @@
-#ifndef _AIC_PAL_H
-#define _AIC_PAL_H
+#ifndef _KORA_PAL_H
+#define _KORA_PAL_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -98,5 +98,4 @@ pid_t pal_wait4(pid_t pid, int *wstatus, int options, void *rusage);
 int   pal_execve(const char *filename, char *const argv[], char *const envp[]);
 int  pal_sched_yield(void);
 
-#endif
-
+#endif /* _KORA_PAL_H */

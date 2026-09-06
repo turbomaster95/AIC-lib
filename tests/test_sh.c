@@ -7,10 +7,10 @@ int main() {
     char input[1024];
     char *args[64];
 
-    printf("\033[1;32mAIC Shell\033[0m (Arch/Termux)\n");
+    printf("\033[1;32mShell\033[0m\n");
 
     while (1) {
-        printf("aic$ ");
+        printf("c$ ");
         
         // Read line
         int i = 0, c;
@@ -36,7 +36,7 @@ int main() {
         long pid = fork();
         if (pid == 0) {
             execve(args[0], args, NULL);
-            printf("aic: command not found: %s\n", args[0]);
+            printf("command not found: %s\n", args[0]);
             exit(1);
         } else {
             int status;

@@ -1,9 +1,9 @@
-# =============================================================================
-# AIC (Ain't it C) Standard Library - Makefile
-# =============================================================================
-# A freestanding C standard library implementation for Linux
+# ===============================================================================
+# Kora C Standard Library - Makefile
+# ===============================================================================
+# A freestanding C standard library implementation for Linux and other platforms
 # Supports: x86_64, aarch64, i386/x86
-# =============================================================================
+# ===============================================================================
 
 to_dep = $(foreach f,$(1),$(dir $(f)).$(notdir $(f:.o=.d)))
 
@@ -42,11 +42,11 @@ else
     PIE_LDFLAGS = 
 endif
 
-AIC_ROOT    = $(shell pwd)
+KORA_ROOT    = $(shell pwd)
 PREFIX      ?= /usr/local
-SYSROOT     ?= $(AIC_ROOT)/sysroot
-INCLUDES    = -I$(AIC_ROOT)/include -I$(AIC_ROOT)/src -I$(AIC_ROOT)/src/platforms/$(PLATF)/arch/$(ARCH) -I$(AIC_ROOT)/src/platforms/$(PLATF)/include
-INCLUDES   += -I$(AIC_ROOT)/src/crt/plat/$(PLATF)/arch/$(ARCH)
+SYSROOT     ?= $(KORA_ROOT)/sysroot
+INCLUDES    = -I$(KORA_ROOT)/include -I$(KORA_ROOT)/src -I$(KORA_ROOT)/src/platforms/$(PLATF)/arch/$(ARCH) -I$(KORA_ROOT)/src/platforms/$(PLATF)/include
+INCLUDES   += -I$(KORA_ROOT)/src/crt/plat/$(PLATF)/arch/$(ARCH)
 
 # Build flags
 ifeq ($(filter $(ARCH),x86 i386),$(ARCH))
@@ -68,16 +68,13 @@ OBJ_DIR     = $(BUILD_DIR)/objs
 SYSROOT_DIR = $(SYSROOT)
 
 # Library names
-LIB_STATIC  = $(LIB_DIR)/libaic.a
-LIB_SHARED  = $(LIB_DIR)/libaic.so
+LIB_STATIC  = $(LIB_DIR)/libkora.a
+LIB_SHARED  = $(LIB_DIR)/libkora.so
 LIBC_A      = $(LIB_DIR)/libc.a
 LIBC_SO     = $(LIB_DIR)/libc.so
 
 LIBM_A      = $(LIB_DIR)/libm.a
 LIBM_SO     = $(LIB_DIR)/libm.so
-
-LDSO        = $(LIB_DIR)/ld.so
-LDSO_SRC    = ld/dynlink.c src/platforms/$(PLATF)/pal.c
 
 RAW_SRCS    = $(shell find src -name "*.c" ! -path "*/platforms/*/*" ! -path "*/crt/*")
 LIBM_SRCS   = $(filter src/math/%, $(RAW_SRCS))
@@ -100,7 +97,6 @@ CRT_ARCH_DIR = src/crt/plat/$(PLATF)/arch/$(ARCH)
 
 CRT1_OBJ    = $(OBJ_DIR)/crt/crt1.o
 SCRT1_OBJ   = $(OBJ_DIR)/crt/Scrt1.o
-RCRT1_OBJ   = $(OBJ_DIR)/crt/rcrt1.o
 CRTI_OBJ    = $(OBJ_DIR)/crt/crti.o
 CRTN_OBJ    = $(OBJ_DIR)/crt/crtn.o
 
@@ -138,7 +134,7 @@ CFLAGS += $(OCFLAGS) $(PLAT_FLAGS)
 ARCFLAGS += $(PLAT_FLAGS)
 ASFLAGS += $(PLAT_FLAGS)
 
-PREQS := dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LIBT) $(LDSO) $(TEST_BINS)
+PREQS := dirs $(LIB_STATIC) $(LIB_SHARED) $(LIBC_A) $(LIBC_SO) $(LIBM_A) $(LIBM_SO) $(CRT_OBJS) $(LIBT) $(TEST_BINS)
 
 ifdef SAN
 MISAN_DIR := third-party/misan
@@ -176,7 +172,7 @@ LD_SO_CFLAGS := $(filter-out -fsanitize=% -MMD -MP -MF%,$(CFLAGS) $(OCFLAGS))
 
 .PHONY: all
 all: $(PREQS)
-	@echo "[AIC] Build complete."
+	@echo "[kora] Build complete."
 
 .PHONY: dirs
 dirs:
@@ -232,11 +228,6 @@ $(SCRT1_OBJ): $(CRT_SRC_DIR)/Scrt1.c
 	@echo "[CC] $<"
 	@$(CC) $(CFLAGS) -fPIE -fno-sanitize=address,undefined -c $< -o $@
 
-$(RCRT1_OBJ): $(CRT_SRC_DIR)/rcrt1.c
-	@mkdir -p $(dir $@)
-	@echo "[CC] $<"
-	@$(CC) $(CFLAGS) -fPIE -DSTATIC_PIE -fno-sanitize=address,undefined -c $< -o $@
-
 $(CRTI_OBJ): $(wildcard $(CRT_ARCH_DIR)/crti.S $(CRT_ARCH_DIR)/crti.s)
 	@mkdir -p $(dir $@)
 	@echo "[AS] $<"
@@ -282,21 +273,12 @@ bin/%: build/tests/%.o $(STARTUP_OBJ) $(LIB_STATIC) $(LIBM_A)
 	@echo "[LD] $@"
 	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) $< $(LIB_STATIC) $(LIBM_A) -o $@
 
-$(LDSO): $(LDSO_SRC)
-	@mkdir -p $(dir $@)
-	@echo "[CCLD] $@"
-	@echo $(LD_SO_CFLAGS)
-	@$(CC) -fPIC -O2 -nostdlib -e _start -shared $(LD_SO_CFLAGS) \
-		-fno-plt -fno-stack-protector -mno-red-zone \
-		-fvisibility=hidden -Wl,-Bsymbolic -Wl,-z,noseparate-code \
-		$^ -o $@
-
 .PHONY: install install-sysroot sysroot
 install: install-sysroot
-	@echo "[AIC] Installation complete to $(PREFIX)"
+	@echo "[kora] Installation complete to $(PREFIX)"
 
 sysroot: install-sysroot
-	@echo "[AIC] Sysroot generated at $(SYSROOT_DIR)"
+	@echo "[kora] Sysroot generated at $(SYSROOT_DIR)"
 
 install-sysroot: all
 	@echo "[INSTALL] Creating sysroot at $(SYSROOT_DIR)..."
@@ -315,7 +297,6 @@ install-sysroot: all
 	@cp $(LIBC_SO) $(SYSROOT_DIR)/lib/
 	@cp $(LIBM_A) $(SYSROOT_DIR)/lib/
 	@cp $(LIBM_SO) $(SYSROOT_DIR)/lib/
-	@cp $(LDSO) $(SYSROOT_DIR)/lib/
 	@cp $(LIB_STATIC) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIB_SHARED) $(SYSROOT_DIR)/usr/lib/
 	@cp $(LIBC_A) $(SYSROOT_DIR)/usr/lib/
@@ -326,9 +307,9 @@ install-sysroot: all
 	@cp $(CRT_OBJS) $(SYSROOT_DIR)/lib/
 	@cp $(CRT_OBJS) $(SYSROOT_DIR)/usr/lib/
 	@echo "[INSTALL] Toolchain scripts..."
-	@cp scripts/aic-gcc $(SYSROOT_DIR)/bin/
-	@cp scripts/aic.spec $(SYSROOT_DIR)/lib/
-	@echo "[AIC] Sysroot ready at: $(SYSROOT_DIR)"
+	@cp scripts/kora-gcc $(SYSROOT_DIR)/bin/
+	@cp scripts/kora.spec $(SYSROOT_DIR)/lib/
+	@echo "[kora] Sysroot ready at: $(SYSROOT_DIR)"
 
 .PHONY: install-system
 install-system: all
@@ -336,56 +317,55 @@ install-system: all
 	@mkdir -p $(PREFIX)/include
 	@mkdir -p $(PREFIX)/lib
 	@cp -r include/* $(PREFIX)/include/
-	@cp $(LIB_STATIC) $(PREFIX)/lib/libaic.a
-	@cp $(LIB_SHARED) $(PREFIX)/lib/libaic.so
+	@cp $(LIB_STATIC) $(PREFIX)/lib/libkora.a
+	@cp $(LIB_SHARED) $(PREFIX)/lib/libkora.so
 	@cp $(LIB_STATIC) $(PREFIX)/lib/libc.a
 	@cp $(LIB_SHARED) $(PREFIX)/lib/libc.so
 	@cp $(LIBM_A) $(PREFIX)/lib/libm.a
 	@cp $(LIBM_SO) $(PREFIX)/lib/libm.so
-	@cp $(LDSO) $(PREFIX)/lib/ld.so
-	@echo "[AIC] Installed to $(PREFIX)"
+	@echo "[kora] Installed to $(PREFIX)"
 
 .PHONY: package
 package: all install-sysroot
-	@echo "[PACKAGE] Creating AIC distribution package..."
-	@mkdir -p $(BUILD_DIR)/package/aic-$(ARCH)-$(PLATF)
-	@cp -r $(SYSROOT_DIR)/* $(BUILD_DIR)/package/aic-$(ARCH)-$(PLATF)/
-	@cp scripts/aic-cc $(BUILD_DIR)/package/aic-$(ARCH)-$(PLATF)/bin/ 2>/dev/null || true
-	@echo "[TAR] Creating aic-$(ARCH)-$(PLATF).tar.gz..."
-	@cd $(BUILD_DIR)/package && tar -czf ../aic-$(ARCH)-$(PLATF).tar.gz aic-$(ARCH)-$(PLATF)
+	@echo "[PKG] Creating Kora distribution package..."
+	@mkdir -p $(BUILD_DIR)/package/kora-$(ARCH)-$(PLATF)
+	@cp -r $(SYSROOT_DIR)/* $(BUILD_DIR)/package/kora-$(ARCH)-$(PLATF)/
+	@cp scripts/kora-cc $(BUILD_DIR)/package/kora-$(ARCH)-$(PLATF)/bin/ 2>/dev/null || true
+	@echo "[TAR] Creating kora-$(ARCH)-$(PLATF).tar.gz..."
+	@cd $(BUILD_DIR)/package && tar -czf ../kora-$(ARCH)-$(PLATF).tar.gz kora-$(ARCH)-$(PLATF)
 	@rm -rf $(BUILD_DIR)/package
-	@echo "[AIC] Package created: $(BUILD_DIR)/aic-$(ARCH)-$(PLATF).tar.gz"
+	@echo "[kora] Package created: $(BUILD_DIR)/kora-$(ARCH)-$(PLATF).tar.gz"
 
 T ?= test_hello
 
 .PHONY: run
 run: all
-	@echo "[AIC-CC] Compiling tests/$(T).c..."
+	@echo "[KORA-CC] Compiling tests/$(T).c..."
 	@mkdir -p bin build/tests
 	@$(CC) \
 		-nostdinc -nostdlib \
-		-I$(AIC_ROOT)/include \
+		-I$(KORA_ROOT)/include \
 		-c tests/$(T).c -o build/tests/$(T).o
 	@$(LD) -static $(PIE_LDFLAGS) --no-dynamic-linker $(STARTUP_OBJ) build/tests/$(T).o $(LIB_STATIC) -o bin/$(T)
-	@echo "[AIC] Running bin/$(T):"
+	@echo "[kora] Running bin/$(T):"
 	@./bin/$(T)
 
 .PHONY: debug
 debug: CFLAGS = $(CFLAGS_DBG)
 debug: clean all
-	@echo "[AIC] Debug build complete."
+	@echo "[kora] Debug build complete."
 
 .PHONY: clean
 clean:
 	@rm -rf $(BUILD_DIR) bin
 	@rm -rf $(SYSROOT_DIR)
 	@rm -rf $(BUILD_DIR)
-	@echo "[AIC] Fully cleaned."
+	@echo "[kora] Fully cleaned."
 
 .PHONY: help
 help:
 	@echo "============================================================================="
-	@echo "  AIC (Ain't it C) Standard Library - Build System"
+	@echo "  Kora C Standard Library - Build System"
 	@echo "============================================================================="
 	@echo ""
 	@echo "  Usage: make [target] [options]"
@@ -412,31 +392,31 @@ help:
 	@echo "    T=<name>      Test name for 'make run' (default: test_hello)"
 	@echo ""
 	@echo "  Compilation (after 'make install'):"
-	@echo "    ./sysroot/bin/aic-gcc hello.c -o hello    # Recommended wrapper"
-	@echo "    ./scripts/aic-gcc hello.c -o hello        # Same as above"
-	@echo "    ./scripts/aic-cc hello.c -o hello         # Alternative wrapper"
+	@echo "    ./sysroot/bin/kora-gcc hello.c -o hello    # Recommended wrapper"
+	@echo "    ./scripts/kora-gcc hello.c -o hello        # Same as above"
+	@echo "    ./scripts/kora-cc hello.c -o hello         # Alternative wrapper"
 	@echo ""
 	@echo "    Using gcc directly (manual):"
 	@echo "    gcc --sysroot=./sysroot -nostdlib \\"
 	@echo "        ./sysroot/usr/lib/crt1.o hello.c \\"
-	@echo "        -L./sysroot/usr/lib -laic -o hello"
+	@echo "        -L./sysroot/usr/lib -lkora -o hello"
 	@echo ""
 	@echo "  Examples:"
 	@echo "    make                          # Build everything"
 	@echo "    make run T=test_malloc        # Run malloc test"
-	@echo "    make install SYSROOT=/opt/aic # Install to custom sysroot"
+	@echo "    make install SYSROOT=/opt/kora # Install to custom sysroot"
 	@echo "    make package                  # Create distribution package"
 	@echo "    make clean && make debug      # Clean debug build"
 	@echo ""
 	@echo "  Output Files:"
-	@echo "    build/lib/libaic.a   - Static library"
-	@echo "    build/lib/libaic.so  - Shared library"
+	@echo "    build/lib/libkora.a   - Static library"
+	@echo "    build/lib/libkora.so  - Shared library"
 	@echo "    build/lib/libc.a     - Alias (libc-compatible)"
 	@echo "    build/lib/libc.so    - Alias (libc-compatible)"
 	@echo "    build/lib/libm.a     - Static math library"
 	@echo "    build/lib/libm.so    - Shared math library"
 	@echo "    sysroot/             - Complete sysroot with headers & libs"
-	@echo "    build/aic-<arch>-<platform>.tar.gz - Distributable package"
+	@echo "    build/kora-<arch>-<platform>.tar.gz - Distributable package"
 	@echo ""
 	@echo "  Available architectures: aarch64, x86_64, i386 (or x86)"
 	@echo "  Available platforms: linux"

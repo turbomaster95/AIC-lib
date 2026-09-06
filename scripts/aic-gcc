@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# =============================================================================
-# AIC-GCC - AIC Standard Library Compiler Driver
-# =============================================================================
-# Drop-in replacement for gcc that compiles against AIC libc.
+# Drop-in replacement for gcc that compiles against Kora.
 # Automatically handles sysroot, startup files, and library linking.
 #
-# Usage: aic-gcc [gcc options] <source.c> -o <output>
+# Usage: kora-gcc [gcc options] <source.c> -o <output>
 #
 # Environment Variables:
-#   AIC_BUILD_INFO   - Custom build info string (default: "Built: YYYY-MM-DD")
-#   AIC_CC           - Override the C compiler (default: gcc)
-#   AIC_NO_BUILDID   - Set to "1" to disable build info injection
+#   KORA_BUILD_INFO   - Custom build info string (default: "Built: YYYY-MM-DD")
+#   KORA_CC           - Override the C compiler (default: gcc)
+#   KORA_NO_BUILDID   - Set to "1" to disable build info injection
 # =============================================================================
 
 set -e
@@ -19,24 +16,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARCH=$(uname -m)
 
 # Compiler selection
-CC="${AIC_CC:-gcc}"
+CC="${KORA_CC:-gcc}"
 
 # Detect if we're running from within a sysroot or from the source tree
-if [[ "$SCRIPT_DIR" == */bin ]] && [ -f "$SCRIPT_DIR/aic-gcc" ]; then
+if [[ "$SCRIPT_DIR" == */bin ]] && [ -f "$SCRIPT_DIR/kora-gcc" ]; then
     PARENT_DIR="$(dirname "$SCRIPT_DIR")"
     if [ -d "$PARENT_DIR/usr/lib" ] && [ -d "$PARENT_DIR/include" ]; then
         SYSROOT="$PARENT_DIR"
-        AIC_ROOT=""
+        KORA_ROOT=""
     fi
 fi
 
-# If not in sysroot, find AIC_ROOT
+# If not in sysroot, find KORA_ROOT
 if [ -z "$SYSROOT" ]; then
-    AIC_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-    if [ -d "$AIC_ROOT/sysroot" ]; then
-        SYSROOT="$AIC_ROOT/sysroot"
-    elif [ -d "$AIC_ROOT/build/sysroot" ]; then
-        SYSROOT="$AIC_ROOT/build/sysroot"
+    KORA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+    if [ -d "$KORA_ROOT/sysroot" ]; then
+        SYSROOT="$KORA_ROOT/sysroot"
+    elif [ -d "$KORA_ROOT/build/sysroot" ]; then
+        SYSROOT="$KORA_ROOT/build/sysroot"
     fi
 fi
 
@@ -49,15 +46,15 @@ if [ -n "$SYSROOT" ]; then
     CRT1_DIR="$SYSROOT/usr/lib"
     LIB_DIR="$SYSROOT/usr/lib"
     INC_DIR="$SYSROOT/usr/include"
-elif [ -n "$AIC_ROOT" ]; then
-    CRT1_DIR="$AIC_ROOT/build/objs/arch/$ARCH"
-    LIB_DIR="$AIC_ROOT/build/lib"
-    INC_DIR="$AIC_ROOT/include"
+elif [ -n "$KORA_ROOT" ]; then
+    CRT1_DIR="$KORA_ROOT/build/objs/arch/$ARCH"
+    LIB_DIR="$KORA_ROOT/build/lib"
+    INC_DIR="$KORA_ROOT/include"
 fi
 
 # Find crt1.o
 CRT1=""
-for dir in "$CRT1_DIR" "$AIC_ROOT/build/objs/arch/$ARCH" "$SYSROOT/lib"; do
+for dir in "$CRT1_DIR" "$KORA_ROOT/build/objs/arch/$ARCH" "$SYSROOT/lib"; do
     if [ -f "$dir/crt1.o" ]; then
         CRT1="$dir/crt1.o"
         break
@@ -65,23 +62,23 @@ for dir in "$CRT1_DIR" "$AIC_ROOT/build/objs/arch/$ARCH" "$SYSROOT/lib"; do
 done
 
 if [ -z "$CRT1" ] || [ ! -f "$CRT1" ]; then
-    echo "aic-gcc: error: cannot find crt1.o" >&2
+    echo "kora-gcc: error: cannot find crt1.o" >&2
     echo "Searched: $CRT1_DIR" >&2
     echo "Run 'make' first." >&2
     exit 1
 fi
 
 # Find library
-LIBAIC=""
-for dir in "$LIB_DIR" "$AIC_ROOT/build/lib" "$SYSROOT/lib"; do
-    if [ -f "$dir/libaic.a" ]; then
-        LIBAIC="$dir/libaic.a"
+LIBKORA=""
+for dir in "$LIB_DIR" "$KORA_ROOT/build/lib" "$SYSROOT/lib"; do
+    if [ -f "$dir/libkora.a" ]; then
+        LIBKORA="$dir/libkora.a"
         break
     fi
 done
 
-if [ -z "$LIBAIC" ]; then
-    echo "aic-gcc: error: cannot find libaic.a" >&2
+if [ -z "$LIBKORA" ]; then
+    echo "kora-gcc: error: cannot find libkora.a" >&2
     echo "Run 'make' first." >&2
     exit 1
 fi
@@ -110,19 +107,17 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -v|--version|-h|--help)
-            echo "AIC-GCC - AIC Standard Library Compiler Driver"
-            echo ""
-            echo "Usage: aic-gcc [gcc options] <source.c> -o <output>"
+            echo "Usage: kora-gcc [gcc options] <source.c> -o <output>"
             echo ""
             echo "Environment Variables:"
-            echo "  AIC_BUILD_INFO   Custom build info string (default: 'Built: YYYY-MM-DD')"
-            echo "  AIC_CC           Override C compiler (default: gcc)"
-            echo "  AIC_NO_BUILDID   Set to '1' to disable build info injection"
+            echo "  KORA_BUILD_INFO   Custom build info string (default: 'Built: YYYY-MM-DD')"
+            echo "  KORA_CC           Override C compiler (default: gcc)"
+            echo "  KORA_NO_BUILDID   Set to '1' to disable build info injection"
             echo ""
             echo "Examples:"
-            echo "  aic-gcc hello.c -o hello"
-            echo "  AIC_BUILD_INFO='v1.0' aic-gcc hello.c -o hello"
-            echo "  AIC_NO_BUILDID=1 aic-gcc hello.c -o hello"
+            echo "  kora-gcc hello.c -o hello"
+            echo "  KORA_BUILD_INFO='v1.0' kora-gcc hello.c -o hello"
+            echo "  KORA_NO_BUILDID=1 kora-gcc hello.c -o hello"
             exit 0
             ;;
         *)
@@ -138,8 +133,8 @@ done
 
 # Check for source files
 if [ ${#SOURCES[@]} -eq 0 ]; then
-    echo "aic-gcc: error: no input files" >&2
-    echo "Usage: aic-gcc [options] <source.c> [-o output]" >&2
+    echo "kora-gcc: error: no input files" >&2
+    echo "Usage: kora-gcc [options] <source.c> [-o output]" >&2
     exit 1
 fi
 
@@ -155,26 +150,26 @@ fi
 # =============================================================================
 # Build Info Injection (ELF Note Section)
 # =============================================================================
-# This adds a .note.AIC section to every executable with build timestamp.
-# Controlled via AIC_BUILD_INFO environment variable.
+# This adds a .note.KORA section to every executable with build timestamp.
+# Controlled via KORA_BUILD_INFO environment variable.
 # =============================================================================
 
 BUILD_INFO_OBJ=""
 
-if [ $COMPILE_ONLY -eq 0 ] && [ -z "$AIC_NO_BUILDID" ]; then
+if [ $COMPILE_ONLY -eq 0 ] && [ -z "$KORA_NO_BUILDID" ]; then
     # Generate build info string
-    if [ -n "$AIC_BUILD_INFO" ]; then
-        BUILD_STR="$AIC_BUILD_INFO"
+    if [ -n "$KORA_BUILD_INFO" ]; then
+        BUILD_STR="$KORA_BUILD_INFO"
     else
         BUILD_STR="Built: $(date +%Y-%m-%d)"
     fi
     
     # Create temporary assembly file with ELF note
-    BUILD_INFO_S=$(mktemp -t aic_build_XXXXXX.s)
-    BUILD_INFO_OBJ=$(mktemp -t aic_build_XXXXXX.o)
+    BUILD_INFO_S=$(mktemp -t kora_build_XXXXXX.s)
+    BUILD_INFO_OBJ=$(mktemp -t kora_build_XXXXXX.o)
     
     # Calculate sizes
-    # Name is "AIC\0" = 4 bytes (already 4-byte aligned)
+    # Name is "KORA\0" = 4 bytes (already 4-byte aligned)
     NAME_SZ=4
     
     # Description is the string + null terminator, padded to 4-byte multiple
@@ -185,11 +180,11 @@ if [ $COMPILE_ONLY -eq 0 ] && [ -z "$AIC_NO_BUILDID" ]; then
     PAD_BYTES=$((DESC_SZ - DESC_RAW_LEN))
     
     cat > "$BUILD_INFO_S" << EOF
-.section .note.AIC, "a", @note
+.section .note.KORA, "a", @note
 .long ${NAME_SZ}
 .long ${DESC_SZ}
 .long 1
-.ascii "AIC\0"
+.ascii "KORA\0"
 .ascii "${BUILD_STR}"
 .byte 0
 EOF
@@ -244,7 +239,7 @@ else
         CMD="$CMD $BUILD_INFO_OBJ"
     fi
     
-    CMD="$CMD $LIBAIC -o $OUTPUT"
+    CMD="$CMD $LIBKORA -o $OUTPUT"
     
     exec $CMD
 fi

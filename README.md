@@ -1,2 +1,2 @@
-# AIC-lib
-The repository for the Ain't it C libc project
+# Kora Libc
+The repository for the Kora Libc project

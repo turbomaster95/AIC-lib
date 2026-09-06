@@ -2,11 +2,11 @@
 
 int main(int argc, char **argv) {
     printf("Testing Buffered Output...\n");
-    
+
     for(int i = 0; i < 1000; i++) {
         putchar('.');
         if (i % 50 == 49) putchar('\n');
     }
-    
+
     return 0;
 }

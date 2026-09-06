@@ -1,16 +1,15 @@
-# AIC (Ain't it C) GCC Spec File
 # =============================================================================
-# Usage: gcc --sysroot=/path/to/sysroot -specs=aic.spec myprog.c -o myprog
+# Usage: gcc --sysroot=/path/to/sysroot -specs=kora.spec myprog.c -o myprog
 #
 # This spec file modifies gcc's default behavior:
 # - Disables standard system libraries (-nostdlib)
-# - Links against libaic automatically
-# - Uses AIC startup files
+# - Links against libkora automatically
+# - Uses Kora startup files
 # =============================================================================
 
 # Replace the default linker specification
 *link:
-%{!shared:%{!static:-static-pie}} --no-standard-libraries -laic
+%{!shared:%{!static:-static-pie}} --no-standard-libraries -lkora
 
 # Startup files - use our crt1.o
 *startfile:
@@ -22,4 +21,4 @@
 
 # Pass preprocessor defines
 *cpp:
--D__AIC__=1 -D__FREESTANDING__=1
+-D__FREESTANDING__=1

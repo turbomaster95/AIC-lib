@@ -1,5 +1,5 @@
-#ifndef AIC_INTERNAL_SYSCALL_H
-#define AIC_INTERNAL_SYSCALL_H
+#ifndef KORA_INTERNAL_SYSCALL_H
+#define KORA_INTERNAL_SYSCALL_H
 
 #include <bits/syscall.h>
 
@@ -178,4 +178,4 @@
 #define __syscall5(n, a, b, c, d, e)    __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, (long)e, 0)
 #define __syscall6(n, a, b, c, d, e, f) __syscall_gen((long)n, (long)a, (long)b, (long)c, (long)d, (long)e, (long)f)
 
-#endif /* AIC_INTERNAL_SYSCALL_H */
+#endif /* KORA_INTERNAL_SYSCALL_H */
